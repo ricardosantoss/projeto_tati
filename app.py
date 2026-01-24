@@ -2,53 +2,63 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import requests
+from fpdf import FPDF
 
-# 1. Configurações da Página
-st.set_page_config(page_title="Sistema PEI - IFMT", layout="wide")
+# --- CONFIGURAÇÃO DA PÁGINA ---
+st.set_page_config(page_title="Gerador PEI - IFMT", layout="wide")
 
-# Estilização IFMT (Verde e Vermelho)
-st.markdown("""
-    <style>
-    .stButton>button { background-color: #2f9e41; color: white; font-weight: bold; width: 100%; border-radius: 8px;}
-    h1 { color: #2f9e41; border-bottom: 3px solid #ed1c24; }
-    .aluno-card { background-color: #ffffff; padding: 25px; border-radius: 12px; border-left: 8px solid #2f9e41; box-shadow: 3px 3px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    .label-pei { color: #2f9e41; font-weight: bold; }
-    </style>
-    """, unsafe_allow_html=True)
+# --- CLASSE PARA GERAÇÃO DO PDF (DIAGRAMAÇÃO EXATA) ---
+class PEI_PDF(FPDF):
+    def header(self):
+        self.set_font("Arial", "B", 10)
+        self.cell(0, 5, "Ministério da Educação", ln=True, align="C")
+        self.cell(0, 5, "Secretaria de Educação Profissional e Tecnológica", ln=True, align="C")
+        self.cell(0, 5, "Instituto Federal de Educação, Ciência e Tecnologia de Mato Grosso", ln=True, align="C")
+        self.ln(5)
+        self.set_font("Arial", "B", 12)
+        self.cell(0, 10, "ANEXO II - PLANO EDUCACIONAL INDIVIDUALIZADO (PEI)", border="B", ln=True, align="C")
+        self.ln(5)
 
-# 2. Função REAL para chamar a IA (Maritalk)
-def chamar_ia_maritalk(prompt):
+    def section_title(self, title):
+        self.set_font("Arial", "B", 10)
+        self.set_fill_color(240, 240, 240)
+        self.cell(0, 8, title, ln=True, fill=True)
+        self.ln(2)
+
+    def content_body(self, text):
+        self.set_font("Arial", "", 10)
+        self.multi_cell(0, 5, str(text))
+        self.ln(4)
+
+# --- FUNÇÃO IA (MARITALK) ---
+def call_maritalk(prompt):
     try:
         api_key = st.secrets["MARITALK_API_KEY"]
         url = "https://chat.maritaca.ai/api/chat/completions"
         headers = {"Authorization": f"Key {api_key}", "Content-Type": "application/json"}
         data = {
             "model": "sabia-3",
-            "messages": [
-                {"role": "system", "content": "Você é um especialista em educação inclusiva do IFMT. Ajude professores a criarem PEIs adaptados conforme o Anexo II."},
-                {"role": "user", "content": prompt}
-            ],
+            "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 2000,
             "temperature": 0.7
         }
         response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 200:
-            return response.json()['choices'][0]['message']['content']
-        else:
-            return f"Erro na API ({response.status_code}): {response.text}"
+        return response.json()['choices'][0]['message']['content']
     except Exception as e:
-        return f"Erro de conexão: {e}"
+        return f"Erro na IA: {e}"
 
-# 3. Conexão e Carregamento (Sem cache para garantir dados novos)
+# --- INTERFACE STREAMLIT ---
+st.title("🌿 Gerador de PEI Oficial - IFMT")
+
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-    df = conn.read(ttl=0) 
+    df = conn.read(ttl=0)
     df.columns = [str(c).strip() for c in df.columns]
 except Exception as e:
-    st.error(f"Erro ao carregar planilha: {e}")
+    st.error(f"Erro na planilha: {e}")
     st.stop()
 
-# Mapeamento das Colunas conforme sua planilha
+# Mapeamento das colunas da planilha (conforme imagem enviada)
 COL_NOME = 'Nome do Estudante'
 COL_RESPONSAVEL = 'Nome do Pai/Mãe ou responsável'
 COL_CONTATO = 'Telefone para contato'
@@ -61,108 +71,84 @@ COL_HABILIDADE = '(04) Conhecimentos e Habilidades'
 COL_DIFICULDADE = '(05) Dificuldades Apresentadas'
 COL_ADAPTACAO = '(06) Adaptações Razoáveis e/ou Acessibilidades'
 
-# 4. Interface Principal
-st.title("🌿 Sistema PEI - IFMT")
-
-if COL_NOME not in df.columns:
-    st.error(f"⚠️ A coluna '{COL_NOME}' não foi detectada. Verifique os nomes no Google Sheets.")
-    st.stop()
-
-aluno_selecionado = st.selectbox("Selecione o Aluno:", ["Selecione..."] + df[COL_NOME].tolist())
-
-if aluno_selecionado != "Selecione...":
-    dados = df[df[COL_NOME] == aluno_selecionado].iloc[0].to_dict()
-
-    # --- Exibição Completa da Ficha Técnica (Itens 01 a 06) ---
-    with st.container():
-        st.markdown(f"""
-        <div class="aluno-card">
-            <h3>(01) Dados Pessoais e Base do AEE</h3>
-            <p><span class="label-pei">Estudante:</span> {dados[COL_NOME]}</p>
-            <p><span class="label-pei">Curso:</span> {dados.get(COL_CURSO, 'N/A')} | <span class="label-pei">Idade:</span> {dados.get(COL_IDADE, 'N/A')}</p>
-            <p><span class="label-pei">Responsável:</span> {dados.get(COL_RESPONSAVEL, 'N/A')} | <span class="label-pei">Contato:</span> {dados.get(COL_CONTATO, 'N/A')}</p>
-            <hr>
-            <p><span class="label-pei">(02) Histórico:</span> {dados.get(COL_HIST, 'N/A')}</p>
-            <p><span class="label-pei">(03) Necessidades:</span> {dados.get(COL_NECESSIDADE, 'N/A')}</p>
-            <p><span class="label-pei">(04) Habilidades:</span> {dados.get(COL_HABILIDADE, 'N/A')}</p>
-            <p><span class="label-pei">(05) Dificuldades:</span> {dados.get(COL_DIFICULDADE, 'N/A')}</p>
-            <p><span class="label-pei">(06) Adaptações Base:</span> {dados.get(COL_ADAPTACAO, 'N/A')}</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.divider()
+if COL_NOME in df.columns:
+    aluno_nome = st.selectbox("Selecione o Estudante:", ["Selecione..."] + df[COL_NOME].tolist())
     
-    # Entradas do Professor da Disciplina
-    col1, col2 = st.columns(2)
-    with col1:
-        docente = st.text_input("Seu Nome (Docente):")
-        materia = st.text_input("Componente Curricular (Matéria):")
-    with col2:
-        tema = st.text_area("Conteúdo/Tópico a ser ensinado:")
-
-    # 5. Lógica de Geração com IA
-    if st.button("🚀 Gerar Planejamento Adaptativo (IA)"):
-        if not tema or not materia:
-            st.warning("Por favor, preencha a matéria e o conteúdo da aula.")
-        else:
-            # Criando o prompt detalhado para a IA
-            prompt_ia = f"""
-            Com base no perfil do aluno abaixo do IFMT, gere os itens (07) ao (11) do PEI para a disciplina de {materia}.
-            
-            DADOS DO ALUNO:
-            - Necessidades: {dados.get(COL_NECESSIDADE, 'N/A')}
-            - Habilidades: {dados.get(COL_HABILIDADE, 'N/A')}
-            - Dificuldades: {dados.get(COL_DIFICULDADE, 'N/A')}
-            - Adaptações já existentes: {dados.get(COL_ADAPTACAO, 'N/A')}
-            
-            CONTEÚDO DA AULA: {tema}
-            
-            FORMATO DE RESPOSTA:
-            Forneça sugestões práticas e pedagógicas para os seguintes tópicos do Anexo II:
-            (07) OBJETIVOS ESPECÍFICOS
-            (08) CONTEÚDOS PROGRAMÁTICOS ADAPTADOS
-            (09) METODOLOGIA (como ensinar este aluno especificamente)
-            (10) AVALIAÇÃO (como medir o aprendizado dele neste tema)
-            (11) RESULTADOS ESPERADOS
-            """
-            
-            with st.spinner("A IA está analisando o perfil e criando o plano pedagógico..."):
-                resultado_ia = chamar_ia_maritalk(prompt_ia)
-                st.session_state['rascunho'] = resultado_ia
-
-    # 6. Edição e Download
-    if 'rascunho' in st.session_state:
-        st.subheader("📝 Revisão e Edição Final")
-        st.caption("O professor deve revisar o conteúdo gerado pela IA antes de imprimir.")
+    if aluno_nome != "Selecione...":
+        aluno = df[df[COL_NOME] == aluno_nome].iloc[0].to_dict()
         
-        texto_editavel = st.text_area("Edite os itens gerados:", value=st.session_state['rascunho'], height=400)
-        
-        # Montagem do arquivo para download formatado
-        documento_download = f"""
-MINISTÉRIO DA EDUCAÇÃO - IFMT
-ANEXO II - PLANO EDUCACIONAL INDIVIDUALIZADO (PEI)
+        st.subheader("📝 Dados da Disciplina")
+        c1, c2 = st.columns(2)
+        with c1:
+            docente = st.text_input("Docente [Item 13]:")
+            componente = st.text_input("Componente Curricular [Item 12]:")
+        with c2:
+            tema = st.text_area("Conteúdo Programático [Item 08]:")
 
-(01) DADOS PESSOAIS
-Estudante: {dados[COL_NOME]}
-Curso: {dados.get(COL_CURSO, 'N/A')}
-Docente: {docente}
-Matéria: {materia}
+        if st.button("🚀 Gerar Planejamento (Itens 07 a 11)"):
+            prompt = f"Gere os itens 07, 09, 10 e 11 do PEI para {aluno_nome}. Necessidade: {aluno[COL_NECESSIDADE]}. Matéria: {componente}. Tema: {tema}."
+            with st.spinner("IA redigindo proposta pedagógica..."):
+                st.session_state['rascunho_ia'] = call_maritalk(prompt)
 
-(03) NECESSIDADES ESPECÍFICAS: {dados.get(COL_NECESSIDADE, 'N/A')}
-(06) ADAPTAÇÕES RAZOÁVEIS: {dados.get(COL_ADAPTACAO, 'N/A')}
+        if 'rascunho_ia' in st.session_state:
+            st.divider()
+            # Campos Editáveis para os 14 itens
+            st.subheader("🔍 Revisão Final dos 14 Itens")
+            
+            it7_11 = st.text_area("Itens (07) a (11) - Gerados pela IA:", value=st.session_state['rascunho_ia'], height=300)
+            bib_basica = st.text_area("(12) Bibliografia Básica:", "Ex: Livro texto da disciplina...")
+            bib_compl = st.text_area("(13) Bibliografia Complementar:", "Ex: Artigos, sites, vídeos...")
 
------------------------------------------------------------
-PLANEJAMENTO (ITENS 07 A 11)
------------------------------------------------------------
-{texto_editavel}
+            if st.button("📄 Gerar PDF de Alta Qualidade"):
+                pdf = PEI_PDF()
+                pdf.add_page()
+                
+                # (01) DADOS PESSOAIS [cite: 5, 6, 7]
+                pdf.section_title("(01) DADOS PESSOAIS")
+                pdf.content_body(f"Nome do Estudante: {aluno[COL_NOME]}\n"
+                                 f"Responsável: {aluno.get(COL_RESPONSAVEL, '')} | Contato: {aluno.get(COL_CONTATO, '')}\n"
+                                 f"Nascimento: {aluno.get(COL_NASC, '')} | Idade: {aluno.get(COL_IDADE, '')}\n"
+                                 f"Curso: {aluno.get(COL_CURSO, '')}\n"
+                                 f"Componente Curricular: {componente}\n"
+                                 f"Docente: {docente}")
 
-Data: {pd.Timestamp.now().strftime('%d/%m/%Y')}
-Assinatura: _________________________________________
-        """
-        
-        st.download_button(
-            label="📥 Baixar PEI Finalizado", 
-            data=documento_download, 
-            file_name=f"PEI_{aluno_selecionado}.txt",
-            mime="text/plain"
-        )
+                # (02) a (06) [cite: 14, 15, 16, 18]
+                pdf.section_title("(02) HISTÓRICO")
+                pdf.content_body(aluno.get(COL_HIST, ''))
+                
+                pdf.section_title("(03) NECESSIDADES EDUCACIONAIS ESPECÍFICAS")
+                pdf.content_body(aluno.get(COL_NECESSIDADE, ''))
+                
+                pdf.section_title("(04/05) HABILIDADES E DIFICULDADES")
+                pdf.content_body(f"Habilidades: {aluno.get(COL_HABILIDADE, '')}\n"
+                                 f"Dificuldades: {aluno.get(COL_DIFICULDADE, '')}")
+                
+                pdf.section_title("(06) ADAPTAÇÕES RAZOÁVEIS")
+                pdf.content_body(aluno.get(COL_ADAPTACAO, ''))
+
+                # (07) a (11) [cite: 19, 20, 21, 22, 24]
+                pdf.section_title("PLANEJAMENTO PEDAGÓGICO (07 A 11)")
+                pdf.content_body(it7_11)
+
+                # (12) a (13) [cite: 25, 26]
+                pdf.section_title("(12) BIBLIOGRAFIA BÁSICA")
+                pdf.content_body(bib_basica)
+                pdf.section_title("(13) BIBLIOGRAFIA COMPLEMENTAR")
+                pdf.content_body(bib_compl)
+
+                # (14) ASSINATURAS [cite: 27]
+                pdf.ln(10)
+                pdf.section_title("(14) ASSINATURAS")
+                pdf.ln(10)
+                pdf.set_font("Arial", "", 8)
+                col_w = 60
+                pdf.cell(col_w, 0, "__________________________", ln=0)
+                pdf.cell(col_w, 0, "__________________________", ln=0)
+                pdf.cell(col_w, 0, "__________________________", ln=1)
+                pdf.cell(col_w, 10, "Docente", ln=0)
+                pdf.cell(col_w, 10, "Coordenação de Curso", ln=0)
+                pdf.cell(col_w, 10, "Departamento de Ensino", ln=1)
+
+                pdf_output = pdf.output()
+                st.download_button(label="📥 Baixar PEI em PDF", data=pdf_output, 
+                                   file_name=f"PEI_{aluno_nome}.pdf", mime="application/pdf")
