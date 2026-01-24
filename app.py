@@ -6,7 +6,7 @@ import requests
 # Configurações da Página
 # Tenta carregar o logo local, se não existir usa o padrão
 try:
-    st.set_page_config(page_title="Sistema PEI - IFMT", layout="wide", page_icon="logo.png")
+    st.set_page_config(page_title="Sistema PEI - IFMT", layout="wide", page_icon="images (1).png")
 except:
     st.set_page_config(page_title="Sistema PEI - IFMT", layout="wide", page_icon="🌿")
 
