@@ -11,7 +11,7 @@ from streamlit_gsheets import GSheetsConnection
 # =========================================================
 # CONFIG STREAMLIT
 # =========================================================
-st.set_page_config(page_title="Gerador PEI - IFMT", layout="wide")
+st.set_page_config(page_title="Organizador do PEI - IFMT", layout="wide")
 
 # CSS para melhorar a estética dos text_areas
 st.markdown("""
