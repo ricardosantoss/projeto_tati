@@ -2,5 +2,4 @@ streamlit
 pandas
 streamlit-gsheets
 requests
-fpdf
 fpdf2
