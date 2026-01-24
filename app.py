@@ -8,7 +8,7 @@ import requests
 try:
     st.set_page_config(page_title="Sistema PEI - IFMT", layout="wide", page_icon="images (1).png")
 except:
-    st.set_page_config(page_title="Sistema PEI - IFMT", layout="wide", page_icon="🌿")
+    st.set_page_config(page_title="Sistema PEI - IFMT", layout="wide", page_icon="images (1).png")
 
 # Estilização IFMT (Verde e Vermelho)
 st.markdown("""
