@@ -3,20 +3,21 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import requests
 
-# 1. Configurações Iniciais e Estilo
+# 1. Configurações da Página
 st.set_page_config(page_title="Sistema PEI - IFMT", layout="wide")
 
+# Estilização com as cores do IFMT
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .stButton>button { background-color: #2f9e41; color: white; font-weight: bold; border-radius: 8px; }
-    h1 { color: #2f9e41; border-bottom: 3px solid #ed1c24; padding-bottom: 10px; }
-    .status-card { background-color: #ffffff; padding: 15px; border-radius: 10px; border-left: 5px solid #2f9e41; box-shadow: 2px 2px 10px rgba(0,0,0,0.05); }
+    .main { background-color: #f9f9f9; }
+    .stButton>button { background-color: #2f9e41; color: white; border-radius: 8px; height: 3em; width: 100%; font-weight: bold; }
+    h1 { color: #2f9e41; border-bottom: 3px solid #ed1c24; }
+    .aluno-box { background-color: white; padding: 20px; border-radius: 10px; border-left: 5px solid #2f9e41; box-shadow: 2px 2px 8px rgba(0,0,0,0.1); }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Função de Integração com a IA (Maritalk)
-def gerar_sugestao_pei(dados_aluno, docente, disciplina, conteudo):
+# 2. Função para chamar a IA (Maritalk)
+def call_maritalk(dados_aluno, docente, disciplina, conteudo):
     try:
         api_key = st.secrets["MARITALK_API_KEY"]
         url = "https://chat.maritaca.ai/api/chat/completions"
@@ -24,134 +25,146 @@ def gerar_sugestao_pei(dados_aluno, docente, disciplina, conteudo):
         
         prompt = f"""
         Você é um especialista em educação inclusiva do IFMT. 
-        Com base nos dados abaixo, complete os itens 07, 08, 09, 10 e 11 do PEI.
+        Gere os itens pedagógicos do PEI para o aluno {dados_aluno['Nome do Estudante']}.
         
-        DADOS DO ALUNO:
-        - Nome: {dados_aluno['Nome do Estudante']}
+        PERFIL DO ALUNO:
         - Necessidades: {dados_aluno['(03) Necessidades Educacionais Específicas']}
         - Habilidades: {dados_aluno['(04) Conhecimentos e Habilidades']}
         - Dificuldades: {dados_aluno['(05) Dificuldades Apresentadas']}
         
-        CONTEXTO DA AULA:
-        - Professor: {docente}
-        - Disciplina: {disciplina}
-        - Conteúdo a ser ensinado: {conteudo}
-        
-        Responda de forma técnica, pedagógica e estruturada para cada item (07 a 11).
+        DISCIPLINA: {disciplina}
+        CONTEÚDO: {conteudo}
+
+        Responda detalhadamente os seguintes itens do Anexo II:
+        (07) OBJETIVOS ESPECÍFICOS:
+        (08) CONTEÚDOS PROGRAMÁTICOS (ADAPTADOS):
+        (09) METODOLOGIA:
+        (10) AVALIAÇÃO:
+        (11) RESULTADOS ESPERADOS:
         """
         
         data = {
             "model": "sabia-3",
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 1500
+            "temperature": 0.7
         }
         
         response = requests.post(url, headers=headers, json=data)
         return response.json()['choices'][0]['message']['content']
     except Exception as e:
-        return f"Erro ao gerar sugestão: {e}"
+        return f"Erro na conexão com a IA: {e}"
 
-# 3. Conexão com a Planilha
+# 3. Carregamento de Dados
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
     df = conn.read()
-except:
-    st.error("Erro ao conectar à planilha. Verifique suas credenciais nos Secrets.")
+    
+    # LIMPEZA CRÍTICA: Remove espaços extras nos nomes das colunas para evitar KeyError
+    df.columns = df.columns.str.strip()
+    
+except Exception as e:
+    st.error(f"Erro ao acessar a planilha: {e}")
     st.stop()
 
-# 4. Interface do Usuário
-st.title("🌿 Gerador de PEI - IFMT (Anexo II)")
+# 4. Interface Principal
+st.title("🌿 Sistema de Elaboração de PEI - IFMT")
+st.caption("Baseado no ANEXO II - PLANO EDUCACIONAL INDIVIDUALIZADO")
 
 if not df.empty:
-    # Seleção do Aluno (Coluna: Nome do Estudante)
-    lista_alunos = df['Nome do Estudante'].tolist()
-    aluno_selecionado = st.selectbox("Escolha o estudante para gerar o PEI:", ["Selecione..."] + lista_alunos)
+    # Verificação de segurança da coluna
+    col_nome = 'Nome do Estudante'
+    if col_nome not in df.columns:
+        st.error(f"Coluna '{col_nome}' não encontrada. Colunas disponíveis: {df.columns.tolist()}")
+        st.stop()
+
+    aluno_selecionado = st.selectbox("Selecione o Estudante:", ["Selecione..."] + df[col_nome].tolist())
 
     if aluno_selecionado != "Selecione...":
-        # Extrai a linha do aluno
-        dados = df[df['Nome do Estudante'] == aluno_selecionado].iloc[0].to_dict()
+        # Puxa os dados da linha do aluno
+        aluno = df[df[col_nome] == aluno_selecionado].iloc[0].to_dict()
 
-        # Exibição de Dados Fixos (Vindo da Planilha/AEE)
-        with st.expander("🔍 Ver Dados Base do AEE (Itens 01 a 06)", expanded=False):
+        with st.container():
             st.markdown(f"""
-            **Histórico:** {dados['(02) Histórico']}  
-            **Necessidades:** {dados['(03) Necessidades Educacionais Específicas']}  
-            **Habilidades:** {dados['(04) Conhecimentos e Habilidades']}  
-            **Dificuldades:** {dados['(05) Dificuldades Apresentadas']}  
-            **Adaptações Sugeridas:** {dados['(06) Adaptações Razoáveis e/ou Acessibilidades']}
-            """)
+            <div class="aluno-box">
+                <h4>(01) Dados do Estudante</h4>
+                <p><b>Nome:</b> {aluno[col_nome]} | <b>Curso:</b> {aluno.get('Curso', 'N/A')}</p>
+                <p><b>Necessidades:</b> {aluno.get('(03) Necessidades Educacionais Específicas', 'N/A')}</p>
+            </div>
+            """, unsafe_allow_html=True)
 
         st.divider()
-
-        # Inputs do Professor da Disciplina
+        
+        # Inputs do Professor
         col1, col2 = st.columns(2)
         with col1:
-            docente_nome = st.text_input("Nome do Docente:")
-            componente = st.text_input("Componente Curricular (Matéria):")
+            nome_docente = st.text_input("Nome do Docente:")
+            materia = st.text_input("Componente Curricular:")
         with col2:
-            conteudo_aula = st.text_area("Conteúdo Programático específico (ex: Frações, Genética...):")
+            tema_aula = st.text_area("Conteúdo Programático:")
 
-        if st.button("🚀 Gerar Proposta de Adaptação Curricular"):
-            if not docente_nome or not conteudo_aula:
-                st.warning("Preencha o nome do docente e o conteúdo da aula.")
+        if st.button("✨ Gerar Proposta de Adaptação (IA)"):
+            if not tema_aula:
+                st.warning("Por favor, informe o conteúdo da aula.")
             else:
-                with st.spinner("A IA está analisando o perfil do aluno e sugerindo adaptações..."):
-                    resultado_ia = gerar_sugestao_pei(dados, docente_nome, componente, conteudo_aula)
-                    st.session_state['rascunho_pei'] = resultado_ia
+                with st.spinner("A IA está analisando o perfil e criando o plano..."):
+                    sugestao = call_maritalk(aluno, nome_docente, materia, tema_aula)
+                    st.session_state['texto_pei'] = sugestao
 
-        # 5. Área de Edição e Finalização
-        if 'rascunho_pei' in st.session_state:
-            st.subheader("📝 Revisão e Edição Final")
-            st.info("O texto abaixo foi gerado pela IA. Você pode editar qualquer parte antes de exportar.")
+        # 5. Edição e Download
+        if 'texto_pei' in st.session_state:
+            st.subheader("📝 Revisão do Professor")
+            st.info("Você pode editar o texto abaixo antes de gerar o documento final.")
             
-            # Campo editável pelo professor
-            texto_final = st.text_area("Edite o conteúdo dos itens 07 a 11:", value=st.session_state['rascunho_pei'], height=400)
+            # Área de edição para o professor
+            conteudo_editado = st.text_area("Edite os itens (07) a (11):", value=st.session_state['texto_pei'], height=400)
 
-            # Montagem do Documento Final formatado
-            pei_completo = f"""
+            # Estrutura final do documento para exportação
+            documento_final = f"""
+MINISTÉRIO DA EDUCAÇÃO
+SECRETARIA DE EDUCAÇÃO PROFISSIONAL E TECNOLÓGICA
 INSTITUTO FEDERAL DE EDUCAÇÃO, CIÊNCIA E TECNOLOGIA DE MATO GROSSO
+
 ANEXO II - PLANO EDUCACIONAL INDIVIDUALIZADO (PEI)
 
 (01) DADOS PESSOAIS
-Estudante: {dados['Nome do Estudante']}
-Responsável: {dados['Nome do Pai/Mãe ou responsável']}
-Telefone: {dados['Telefone para contato']}
-Nascimento: {dados['Data do Nascimento']} | Idade: {dados['Idade']}
-Curso: {dados['Curso']}
-Componente Curricular: {componente}
-Docente: {docente_nome}
+Nome do Estudante: {aluno[col_nome]}
+Nome do Pai/Mãe ou responsável: {aluno.get('Nome do Pai/Mãe ou responsável', '')}
+Telefone: {aluno.get('Telefone para contato', '')}
+Nascimento: {aluno.get('Data do Nascimento', '')} | Idade: {aluno.get('Idade', '')}
+Curso: {aluno.get('Curso', '')}
+Componente Curricular: {materia}
+Docente: {nome_docente}
 
 (02) HISTÓRICO
-{dados['(02) Histórico']}
+{aluno.get('(02) Histórico', '')}
 
 (03) NECESSIDADES EDUCACIONAIS ESPECÍFICAS
-{dados['(03) Necessidades Educacionais Específicas']}
+{aluno.get('(03) Necessidades Educacionais Específicas', '')}
 
-(04) CONHECIMENTOS E HABILIDADES | (05) DIFICULDADES
-Habilidades: {dados['(04) Conhecimentos e Habilidades']}
-Dificuldades: {dados['(05) Dificuldades Apresentadas']}
+(04/05) HABILIDADES E DIFICULDADES
+Habilidades: {aluno.get('(04) Conhecimentos e Habilidades', '')}
+Dificuldades: {aluno.get('(05) Dificuldades Apresentadas', '')}
 
-(06) ADAPTAÇÕES RAZOÁVEIS E/OU ACESSIBILIDADES
-{dados['(06) Adaptações Razoáveis e/ou Acessibilidades']}
+(06) ADAPTAÇÕES RAZOÁVEIS
+{aluno.get('(06) Adaptações Razoáveis e/ou Acessibilidades', '')}
 
-----------------------------------------------------------------------
-ADAPTAÇÕES CURRICULARES (ITENS 07 A 11)
-----------------------------------------------------------------------
-{texto_final}
+------------------------------------------------------------------
+PLANEJAMENTO PEDAGÓGICO (ITENS 07 A 11)
+------------------------------------------------------------------
+{conteudo_editado}
 
 (14) ASSINATURAS
-___________________________          ___________________________
-Docente                               Coordenação de Curso
+Assinatura do Docente: ___________________________
+Assinatura da Coordenação: _______________________
 
 Data: {pd.Timestamp.now().strftime('%d/%m/%Y')}
             """
 
             st.download_button(
-                label="📥 Baixar PEI Finalizado (.txt)",
-                data=pei_completo,
-                file_name=f"PEI_{aluno_selecionado}_{componente}.txt",
+                label="📥 Baixar PEI Pronto (.txt)",
+                data=documento_final,
+                file_name=f"PEI_{aluno_selecionado}.txt",
                 mime="text/plain"
             )
 else:
-    st.warning("Nenhum dado encontrado na planilha.")
-
+    st.error("A planilha está vazia ou não pôde ser lida.")
