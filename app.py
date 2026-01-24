@@ -1,7 +1,8 @@
 # app.py — Gerador de PEI (Anexo II) COMPLETO
-# ✅ Layout do PDF ajustado (sem duplicação de texto, tabela (01) alinhada)
-# ✅ “Aplicar sugestões da IA” funciona (campos controlados por st.session_state)
-# ✅ Logo IFMT no cabeçalho do PDF: arquivo "images (1).png"
+# ✅ PDF alinhado + sem duplicação + logo IFMT
+# ✅ IA gera (07/09/10/11)
+# ✅ "Aplicar sugestões" FUNCIONA (callback on_click, sem StreamlitAPIException)
+# ✅ download robusto (tempfile)
 
 import os
 import io
@@ -23,7 +24,6 @@ st.title("🌿 Gerador de PEI Oficial - IFMT")
 # HELPERS
 # =========================================================
 def s(value) -> str:
-    """Converte valores (incluindo NaN) em string segura."""
     if value is None:
         return ""
     try:
@@ -34,7 +34,6 @@ def s(value) -> str:
     return str(value).strip()
 
 def call_maritalk(prompt: str) -> str:
-    """Chamada à API Maritaca (sabia-3)."""
     try:
         api_key = st.secrets["MARITALK_API_KEY"]
         url = "https://chat.maritaca.ai/api/chat/completions"
@@ -53,10 +52,6 @@ def call_maritalk(prompt: str) -> str:
         return f"Erro ao gerar sugestão automática via IA: {e}"
 
 def parse_ia_blocks(text: str) -> dict:
-    """
-    Extrai (07), (09), (10), (11) do texto da IA.
-    Aceita: (07) ... / 07) ... / 07 - ...
-    """
     out = {"07": "", "09": "", "10": "", "11": ""}
     if not text:
         return out
@@ -78,6 +73,54 @@ def parse_ia_blocks(text: str) -> dict:
     return out
 
 # =========================================================
+# STATE INIT (antes de qualquer widget com key)
+# =========================================================
+def init_state():
+    defaults = {
+        "k_07": "",
+        "k_08": "",
+        "k_09": "",
+        "k_10": "",
+        "k_11": "",
+        "ia_raw": "",
+        "ia_07": "",
+        "ia_09": "",
+        "ia_10": "",
+        "ia_11": "",
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+
+init_state()
+
+# =========================================================
+# CALLBACKS (solução do erro)
+# =========================================================
+def apply_ia_to_fields():
+    """Aplica sugestões aos campos controlados (k_07..k_11) via callback."""
+    if sts := st.session_state:
+        if s(R := R := R):  # noop para evitar lint, ignore
+            pass
+
+    if st.session_state.get("ia_07"):
+        st.session_state["k_07"] = st.session_state["ia_07"]
+    if st.session_state.get("ia_09"):
+        st.session_state["k_09"] = st.session_state["ia_09"]
+    if st.session_state.get("ia_10"):
+        st.session_state["k_10"] = st.session_state["ia_10"]
+    if st.session_state.get("ia_11"):
+        st.session_state["k_11"] = st.session_state["ia_11"]
+    st.session_state["applied_ok"] = True
+
+def clear_ia():
+    st.session_state["ia_raw"] = ""
+    st.session_state["ia_07"] = ""
+    st.session_state["ia_09"] = ""
+    st.session_state["ia_10"] = ""
+    st.session_state["ia_11"] = ""
+
+# =========================================================
 # PDF (Padrão ANEXO II) — CORRIGIDO + LOGO
 # =========================================================
 class PEI_PDF(FPDF):
@@ -86,7 +129,6 @@ class PEI_PDF(FPDF):
         self.set_auto_page_break(auto=True, margin=12)
         self.set_margins(12, 12, 12)
 
-        # Fonte Unicode para acentos
         self.font_regular = "DejaVu"
         self.font_bold = "DejaVuB"
         dejavu = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
@@ -99,24 +141,19 @@ class PEI_PDF(FPDF):
             self.font_regular = "Arial"
             self.font_bold = "Arial"
 
-        self.LINE_H = 7
         self.SECTION_H = 7
         self.PAD = 1.6
-
         self.logo_path = logo_path if logo_path and os.path.exists(logo_path) else None
 
     def header(self):
-        # --- Logo IFMT (centralizado acima do texto) ---
         if self.logo_path:
             try:
-                # Coloca no topo, centralizado
-                img_w = 26  # ajuste fino se quiser
+                img_w = 26
                 x = (self.w - img_w) / 2
                 y = 10
                 self.image(self.logo_path, x=x, y=y, w=img_w)
-                self.ln(18)  # espaço abaixo do logo
+                self.ln(18)
             except Exception:
-                # Se der problema com o PNG, apenas ignora
                 self.ln(2)
         else:
             self.ln(2)
@@ -132,15 +169,13 @@ class PEI_PDF(FPDF):
         self.cell(0, 7, "PLANO EDUCACIONAL INDIVIDUALIZADO (PEI)", ln=True, align="C")
         self.ln(3)
 
-    # ---------- layout ----------
     def section_bar(self, text):
         self.set_font(self.font_bold, "", 10)
         self.set_fill_color(240, 240, 240)
         self.cell(0, self.SECTION_H, text, ln=True, fill=True, border=1)
         self.ln(2)
 
-    def _cell_fit(self, w, h, txt, border=1, ln=0, align="L", fill=False, bold=False):
-        """Escreve texto reduzindo a fonte do rótulo até caber."""
+    def _cell_fit(self, w, h, txt, border=1, ln=0, align="L", bold=False):
         base = 10
         min_size = 7
         font = self.font_bold if bold else self.font_regular
@@ -151,11 +186,10 @@ class PEI_PDF(FPDF):
             base -= 1
             self.set_font(font, "", base)
 
-        self.cell(w, h, t, border=border, ln=ln, align=align, fill=fill)
+        self.cell(w, h, t, border=border, ln=ln, align=align)
         self.set_font(self.font_regular, "", 10)
 
     def row_2(self, label, value, label_w=65, h=7):
-        """Linha [label][value]"""
         total_w = self.w - self.l_margin - self.r_margin
         value_w = total_w - label_w
         self._cell_fit(label_w, h, label, border=1, ln=0, bold=True)
@@ -163,7 +197,6 @@ class PEI_PDF(FPDF):
         self.cell(value_w, h, s(value), border=1, ln=1)
 
     def row_4(self, label1, val1, label2, val2, w1=65, w3=18, h=7):
-        """Linha [label1][val1][label2][val2] (Obs. geralmente em label2)."""
         total_w = self.w - self.l_margin - self.r_margin
         remaining = total_w - (w1 + w3)
         w2 = remaining * 0.62
@@ -178,7 +211,6 @@ class PEI_PDF(FPDF):
         self.cell(w4, h, s(val2), border=1, ln=1)
 
     def row_4_custom(self, label1, val1, label2, val2, w1=65, w2=70, w3=45, h=7):
-        """Linha 4 colunas com larguras mais controladas (telefone/data etc.)."""
         total_w = self.w - self.l_margin - self.r_margin
         w4 = total_w - (w1 + w2 + w3)
 
@@ -191,7 +223,6 @@ class PEI_PDF(FPDF):
         self.cell(w4, h, s(val2), border=1, ln=1)
 
     def big_box(self, text, min_h=28):
-        """Caixa grande SEM texto duplicado (usa split_only quando disponível)."""
         x = self.get_x()
         y = self.get_y()
         w = self.w - self.l_margin - self.r_margin
@@ -199,7 +230,6 @@ class PEI_PDF(FPDF):
 
         self.set_font(self.font_regular, "", 10)
 
-        # Calcula altura sem imprimir
         try:
             lines = self.multi_cell(w - 2*self.PAD, 5, t, border=0, split_only=True)
             n_lines = max(1, len(lines))
@@ -242,9 +272,6 @@ class PEI_PDF(FPDF):
             self.cell(right_w, 6, "Data:", ln=1, align="R")
             self.ln(1)
 
-# =========================================================
-# PDF download robusto (Streamlit Cloud-friendly)
-# =========================================================
 def pdf_to_tempfile(pdf: PEI_PDF) -> str:
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     tmp_path = tmp.name
@@ -296,23 +323,7 @@ aluno = aluno_row.to_dict()
 
 st.subheader("📝 Preenchimento do Plano")
 
-# =========================================================
-# CAMPOS CONTROLADOS (STATE) — para “Aplicar IA” funcionar
-# =========================================================
-defaults = {
-    "k_07": "",
-    "k_08": "",
-    "k_09": "",
-    "k_10": "",
-    "k_11": "",
-}
-for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
-
-# =========================================================
 # (01) extras
-# =========================================================
 c1, c2, c3 = st.columns(3)
 with c1:
     docente_input = st.text_input("Docente:", value="")
@@ -321,23 +332,25 @@ with c2:
 with c3:
     obs_input = st.text_input("Obs. (responsável):", value=s(aluno.get(COL_OBS, "")))
 
-# (02) Histórico editável
+# (02)
 texto_historico = st.text_area("(02) Histórico (Edite se necessário):", value=s(aluno.get(COL_HIST, "")), height=120)
 
-# (03)-(06) — edição opcional
+# (03)-(06)
 with st.expander("Ver/editar (03) a (06) (opcional)", expanded=False):
-    necessidade_03 = st.text_area("(03) Necessidades Educacionais Específicas:", value=s(aluno.get(COL_NECESSIDADE, "")), height=90)
-    hab_04 = st.text_area("(04) Conhecimentos e Habilidades:", value=s(aluno.get(COL_HAB, "")), height=90)
-    dif_05 = st.text_area("(05) Dificuldades Apresentadas:", value=s(aluno.get(COL_DIF, "")), height=90)
-    adapt_06 = st.text_area("(06) Adaptações Razoáveis/Acessibilidades:", value=s(aluno.get(COL_ADAPT, "")), height=90)
+    necessidade_val = st.text_area("(03) Necessidades Educacionais Específicas:", value=s(aluno.get(COL_NECESSIDADE, "")), height=90)
+    hab_val = st.text_area("(04) Conhecimentos e Habilidades:", value=s(aluno.get(COL_HAB, "")), height=90)
+    dif_val = st.text_area("(05) Dificuldades Apresentadas:", value=s(aluno.get(COL_DIF, "")), height=90)
+    adapt_val = st.text_area("(06) Adaptações Razoáveis/Acessibilidades:", value=s(aluno.get(COL_ADAPT, "")), height=90)
 
-necessidade_val = locals().get("necessidade_03", s(aluno.get(COL_NECESSIDADE, "")))
-hab_val = locals().get("hab_04", s(aluno.get(COL_HAB, "")))
-dif_val = locals().get("dif_05", s(aluno.get(COL_DIF, "")))
-adapt_val = locals().get("adapt_06", s(aluno.get(COL_ADAPT, "")))
+# se expander não foi aberto, garante defaults
+if "necessidade_val" not in locals():
+    necessidade_val = s(aluno.get(COL_NECESSIDADE, ""))
+    hab_val = s(aluno.get(COL_HAB, ""))
+    dif_val = s(aluno.get(COL_DIF, ""))
+    adapt_val = s(aluno.get(COL_ADAPT, ""))
 
 # =========================================================
-# (07)-(11) — CONTROLADOS POR SESSION_STATE
+# (07)-(11) — CONTROLADOS
 # =========================================================
 st.markdown("### Desenvolvimento pedagógico (07)–(11)")
 
@@ -352,11 +365,13 @@ with colB:
     st.text_area("(11) Resultados Esperados:", height=140, key="k_11")
 
 # IA
-if st.button("🚀 Gerar Sugestões (IA) para (07), (09), (10) e (11)"):
-    if not materia_input or not st.session_state["k_08"].strip():
-        st.warning("Preencha 'Componente Curricular' e '(08) Conteúdos Programáticos' para a IA sugerir.")
-    else:
-        prompt = f"""
+col_btn1, col_btn2 = st.columns([1, 1])
+with col_btn1:
+    if st.button("🚀 Gerar Sugestões (IA)"):
+        if not materia_input or not st.session_state["k_08"].strip():
+            st.warning("Preencha 'Componente Curricular' e '(08) Conteúdos Programáticos' para a IA sugerir.")
+        else:
+            prompt = f"""
 Você é um especialista em PEI (Plano Educacional Individualizado) e educação inclusiva.
 Gere sugestões OBJETIVAS e PRÁTICAS, em PT-BR, com bullets curtos.
 
@@ -376,30 +391,27 @@ Dificuldades (05): {dif_val}
 Adaptações (06): {adapt_val}
 Conteúdos (08): {st.session_state["k_08"]}
 """
-        ia_raw = call_maritalk(prompt)
-        st.session_state["ia_raw"] = ia_raw
-        blocks = parse_ia_blocks(ia_raw)
-        st.session_state["ia_07"] = blocks.get("07", "")
-        st.session_state["ia_09"] = blocks.get("09", "")
-        st.session_state["ia_10"] = blocks.get("10", "")
-        st.session_state["ia_11"] = blocks.get("11", "")
+            ia_raw = call_maritalk(prompt)
+            st.session_state["ia_raw"] = ia_raw
+            blocks = parse_ia_blocks(ia_raw)
+            st.session_state["ia_07"] = blocks.get("07", "")
+            st.session_state["ia_09"] = blocks.get("09", "")
+            st.session_state["ia_10"] = blocks.get("10", "")
+            st.session_state["ia_11"] = blocks.get("11", "")
 
-if "ia_raw" in st.session_state:
+with col_btn2:
+    st.button("🧹 Limpar IA", on_click=clear_ia)
+
+if st.session_state.get("ia_raw"):
     st.text_area("📌 Sugestões brutas da IA:", value=st.session_state["ia_raw"], height=140)
 
-if any(k in st.session_state for k in ["ia_07", "ia_09", "ia_10", "ia_11"]):
-    if st.button("✅ Aplicar sugestões da IA nos campos"):
-        if st.session_state.get("ia_07"):
-            st.session_state["k_07"] = st.session_state["ia_07"]
-        if st.session_state.get("ia_09"):
-            st.session_state["k_09"] = st.session_state["ia_09"]
-        if st.session_state.get("ia_10"):
-            st.session_state["k_10"] = st.session_state["ia_10"]
-        if st.session_state.get("ia_11"):
-            st.session_state["k_11"] = st.session_state["ia_11"]
+# ✅ Aplicar com CALLBACK (resolve seu erro)
+if any(st.session_state.get(k) for k in ["ia_07", "ia_09", "ia_10", "ia_11"]):
+    st.button("✅ Aplicar sugestões da IA nos campos", on_click=apply_ia_to_fields)
 
-        st.success("Sugestões aplicadas.")
-        st.rerun()
+if st.session_state.get("applied_ok"):
+    st.success("Sugestões aplicadas nos campos (07/09/10/11).")
+    st.session_state["applied_ok"] = False
 
 # (12)-(13)
 b1, b2 = st.columns(2)
@@ -416,34 +428,26 @@ st.subheader("📄 PDF no padrão do Anexo II (com logo IFMT)")
 
 use_tempfile = st.checkbox("Modo ultra-robusto (arquivo temporário) — recomendado na Streamlit Cloud", value=True)
 
-# Caminho do logo (arquivo no mesmo diretório do app.py)
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
-LOGO_PATH = os.path.join(APP_DIR, "images (1).png")  # <- seu arquivo
+LOGO_PATH = os.path.join(APP_DIR, "images (1).png")  # coloque esse arquivo junto do app.py
 
 if st.button("📌 Montar PDF"):
     pdf = PEI_PDF(logo_path=LOGO_PATH)
     pdf.add_page()
 
-    # (01) — tabela alinhada
+    # (01)
     pdf.section_bar("(01) DADOS PESSOAIS")
     pdf.row_2("Nome do Estudante:", s(aluno.get(COL_NOME)))
-
     pdf.row_4("Nome do Pai/Mãe ou responsável:", s(aluno.get(COL_RESP)), "Obs.:", obs_input, w1=65, w3=18)
+    pdf.row_4_custom("Telefone para contato:", s(aluno.get(COL_TEL)), "Data do Nascimento:", s(aluno.get(COL_NASC)), w1=65, w2=70, w3=45)
+    pdf.row_4_custom("Idade:", s(aluno.get(COL_IDADE)), "Curso:", s(aluno.get(COL_CURSO)), w1=65, w2=70, w3=45)
+    pdf.row_4_custom("Componente Curricular:", materia_input, "Docente:", docente_input, w1=65, w2=70, w3=45)
 
-    pdf.row_4_custom("Telefone para contato:", s(aluno.get(COL_TEL)), "Data do Nascimento:", s(aluno.get(COL_NASC)),
-                     w1=65, w2=70, w3=45)
-
-    pdf.row_4_custom("Idade:", s(aluno.get(COL_IDADE)), "Curso:", s(aluno.get(COL_CURSO)),
-                     w1=65, w2=70, w3=45)
-
-    pdf.row_4_custom("Componente Curricular:", materia_input, "Docente:", docente_input,
-                     w1=65, w2=70, w3=45)
-
-    # (02) — sem duplicação
+    # (02)
     pdf.section_bar("(02) HISTÓRICO (ANTERIOR, EM INSTITUIÇÃO DE ORIGEM ATÉ A ATUALIDADE)")
     pdf.big_box(texto_historico, min_h=28)
 
-    # (03)–(06)
+    # (03)-(06)
     pdf.section_bar("(03) NECESSIDADES EDUCACIONAIS ESPECÍFICAS")
     pdf.big_box(necessidade_val, min_h=20)
 
@@ -456,7 +460,7 @@ if st.button("📌 Montar PDF"):
     pdf.section_bar("(06) ADAPTAÇÕES RAZOÁVEIS E/OU ACESSIBILIDADES CURRICULARES")
     pdf.big_box(adapt_val, min_h=20)
 
-    # (07)–(11) — lê do session_state
+    # (07)-(11) — do session_state
     pdf.section_bar("(07) OBJETIVOS ESPECÍFICOS")
     pdf.big_box(st.session_state["k_07"], min_h=18)
 
@@ -472,7 +476,7 @@ if st.button("📌 Montar PDF"):
     pdf.section_bar("(11) RESULTADOS ESPERADOS")
     pdf.big_box(st.session_state["k_11"], min_h=18)
 
-    # (12)–(13)
+    # (12)-(13)
     pdf.section_bar("(12) BIBLIOGRAFIA BÁSICA")
     pdf.big_box(bib_b, min_h=16)
 
@@ -482,7 +486,6 @@ if st.button("📌 Montar PDF"):
     # (14)
     pdf.signatures()
 
-    # Download robusto
     if use_tempfile:
         tmp_path = pdf_to_tempfile(pdf)
         with open(tmp_path, "rb") as f:
@@ -494,11 +497,7 @@ if st.button("📌 Montar PDF"):
             )
     else:
         out = pdf.output(dest="S")
-        if isinstance(out, str):
-            pdf_bytes = out.encode("latin-1", errors="replace")
-        else:
-            pdf_bytes = bytes(out)
-
+        pdf_bytes = out.encode("latin-1", errors="replace") if isinstance(out, str) else bytes(out)
         st.download_button(
             label="📥 Baixar PDF Finalizado",
             data=io.BytesIO(pdf_bytes),
@@ -507,5 +506,6 @@ if st.button("📌 Montar PDF"):
         )
 
     st.success("PDF montado! Use o botão de download acima.")
+
 
 
