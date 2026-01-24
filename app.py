@@ -3,152 +3,146 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import requests
 
-# Configurações da Página
-# Tenta carregar o logo local, se não existir usa o padrão
-try:
-    st.set_page_config(page_title="Sistema PEI - IFMT", layout="wide", page_icon="images (1).png")
-except:
-    st.set_page_config(page_title="Sistema PEI - IFMT", layout="wide", page_icon="images (1).png")
+# Configurações de Página
+st.set_page_config(page_title="Sistema PEI - IFMT", layout="wide")
 
-# Estilização IFMT (Verde e Vermelho)
+# Estilização IFMT
 st.markdown("""
     <style>
-    .main {
-        background-color: #f5f5f5;
-    }
-    .stButton>button {
-        background-color: #2f9e41;
-        color: white;
-        border-radius: 5px;
-    }
-    .stSidebar {
-        background-color: #ffffff;
-    }
-    h1 {
-        color: #2f9e41;
-        border-bottom: 2px solid #ed1c24;
-    }
-    .aluno-card {
-        background-color: white;
-        padding: 20px;
-        border-radius: 10px;
-        border-left: 5px solid #2f9e41;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
-    }
+    .main { background-color: #f5f5f5; }
+    .stButton>button { background-color: #2f9e41; color: white; width: 100%; }
+    h1 { color: #2f9e41; border-bottom: 2px solid #ed1c24; }
+    .preview-box { background-color: white; padding: 20px; border: 1px solid #ccc; border-radius: 5px; font-family: 'Courier New', Courier, monospace; }
     </style>
     """, unsafe_allow_html=True)
 
-# Função para chamar Maritalk (usando Secrets)
 def call_maritalk(prompt):
     try:
         api_key = st.secrets["MARITALK_API_KEY"]
-    except:
-        st.error("Erro: Chave MARITALK_API_KEY não configurada nos Secrets.")
+        url = "https://chat.maritaca.ai/api/chat/completions"
+        headers = {"Authorization": f"Key {api_key}", "Content-Type": "application/json"}
+        data = {
+            "model": "sabia-3",
+            "messages": [
+                {"role": "system", "content": "Você é um especialista em educação inclusiva do IFMT. Responda em formato JSON com as chaves: objetivos, conteudos, metodologia, avaliacao, resultados, bibliografia."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.7
+        }
+        response = requests.post(url, headers=headers, json=data)
+        return response.json()['choices'][0]['message']['content']
+    except Exception as e:
         return None
 
-    url = "https://chat.maritaca.ai/api/chat/completions"
-    headers = {"Authorization": f"Key {api_key}", "Content-Type": "application/json"}
-    data = {
-        "model": "sabia-3",
-        "messages": [
-            {"role": "system", "content": "Você é um especialista em educação inclusiva do IFMT. Ajude professores a criarem PEIs e atividades adaptadas."},
-            {"role": "user", "content": prompt}
-        ],
-        "max_tokens": 2000,
-        "temperature": 0.7
-    }
-    
-    try:
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 200:
-            return response.json()['choices'][0]['message']['content']
-        else:
-            return f"Erro na API: {response.text}"
-    except Exception as e:
-        return f"Erro de conexão: {e}"
+# Conexão
+conn = st.connection("gsheets", type=GSheetsConnection)
+df = conn.read()
 
-# Navegação
-page = st.sidebar.radio("Navegação", ["Gerador de PEI", "Sugestão de Atividades"])
+st.title("🌿 Elaboração de PEI Adaptado - IFMT")
 
-# Conexão com Google Sheets
-try:
-    conn = st.connection("gsheets", type=GSheetsConnection)
-    df = conn.read()
-except Exception as e:
-    st.error("Erro ao conectar com a planilha. Verifique os Secrets.")
-    st.stop()
-
-if page == "Gerador de PEI":
-    st.title("🌿 Gerador de PEI - IFMT")
-    
-    if 'Nome' in df.columns:
-        aluno_nome = st.selectbox("Selecione o Aluno:", ["Selecione..."] + df['Nome'].tolist())
-        
-        if aluno_nome != "Selecione...":
-            aluno_info = df[df['Nome'] == aluno_nome].iloc[0].to_dict()
-            
-            # Mostra dados apenas após seleção
-            with st.container():
-                st.markdown(f"""
-                <div class="aluno-card">
-                    <h3>Dados do Aluno: {aluno_nome}</h3>
-                    <p><b>Diagnóstico:</b> {aluno_info.get('Diagnóstico', 'N/A')}</p>
-                    <p><b>Dificuldades:</b> {aluno_info.get('Dificuldades', 'N/A')}</p>
-                    <p><b>Pontos Fortes:</b> {aluno_info.get('Pontos Fortes', 'N/A')}</p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            st.divider()
-            
-            conteudo = st.text_area("Conteúdo/Tópico a ser ministrado:", placeholder="Ex: Equações do 2º grau, Revolução Francesa...")
-            
-            if st.button("Gerar PEI Adaptado"):
-                if not conteudo:
-                    st.warning("Por favor, informe o conteúdo que será ministrado.")
-                else:
-                    prompt = f"""
-                    Gere um PEI (Plano de Ensino Individualizado) para o aluno {aluno_nome}.
-                    Dados do aluno: {aluno_info}
-                    Conteúdo a ser ministrado: {conteudo}
-                    
-                    O plano deve focar em como adaptar este conteúdo específico para as necessidades do aluno.
-                    """
-                    with st.spinner("Gerando PEI..."):
-                        resultado = call_maritalk(prompt)
-                        if resultado:
-                            st.markdown("### 📄 PEI Sugerido")
-                            st.markdown(resultado)
-                            st.download_button("Baixar PEI (Markdown)", resultado, f"PEI_{aluno_nome}.md")
-    else:
-        st.error("Coluna 'Nome' não encontrada na planilha.")
-
-elif page == "Sugestão de Atividades":
-    st.title("💡 Sugestão de Atividades Adaptadas")
-    
-    aluno_nome = st.selectbox("Selecione o Aluno para a atividade:", ["Selecione..."] + df['Nome'].tolist())
+if 'Nome' in df.columns:
+    aluno_nome = st.selectbox("Selecione o Aluno:", ["Selecione..."] + df['Nome'].tolist())
     
     if aluno_nome != "Selecione...":
-        aluno_info = df[df['Nome'] == aluno_nome].iloc[0].to_dict()
-        conteudo_atv = st.text_input("Qual o tema da atividade?", placeholder="Ex: Frações, Ecossistemas...")
+        aluno = df[df['Nome'] == aluno_nome].iloc[0]
         
-        if st.button("Propor Atividades"):
-            if not conteudo_atv:
-                st.warning("Informe o tema da atividade.")
-            else:
-                prompt_atv = f"""
-                Com base no perfil do aluno {aluno_nome} ({aluno_info}), 
-                proponha 3 atividades práticas e adaptadas sobre o tema: {conteudo_atv}.
-                As atividades devem ser inclusivas e considerar os pontos fortes do aluno.
-                """
-                with st.spinner("Criando sugestões..."):
-                    resultado_atv = call_maritalk(prompt_atv)
-                    if resultado_atv:
-                        st.markdown(resultado_atv)
-                        st.download_button("Baixar Sugestões", resultado_atv, f"Atividades_{aluno_nome}.md")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("Dados do AEE (Base)")
+            st.info(f"**Necessidades:** {aluno['Necessidades']}")
+            st.info(f"**Habilidades:** {aluno['Habilidades']}")
+        
+        with col2:
+            st.subheader("Dados da Disciplina")
+            docente = st.text_input("Nome do Docente:", placeholder="Nome do professor da disciplina")
+            componente = st.text_input("Componente Curricular:", placeholder="Ex: Matemática I")
+            tema = st.text_area("Conteúdo a ser adaptado:", placeholder="Descreva o que será ensinado...")
 
-# Rodapé
-st.sidebar.divider()
-st.sidebar.image("https://ifmt.edu.br/media/filer_public_thumbnails/filer_public/01/0e/010e6e8e-2e6e-4e1e-8e6e-010e6e8e2e6e/logo_ifmt.png__200x200_q85_subsampling-2.png", width=100)
-st.sidebar.caption("Sistema de Apoio à Inclusão - IFMT")
+        if st.button("1. Gerar Proposta Inicial com IA"):
+            prompt = f"Gere adaptações para o aluno {aluno_nome} que tem {aluno['Necessidades']}. Conteúdo: {tema}. Foque nos itens 7 a 12 do PEI."
+            with st.spinner("IA trabalhando na adaptação..."):
+                # Simulação de resposta ou chamada real
+                resposta_ia = call_maritalk(prompt)
+                # Nota: Idealmente aqui você faria o parse do JSON da IA para preencher os campos abaixo
+                st.session_state['proposta'] = True
+
+        if 'proposta' in st.session_state:
+            st.divider()
+            st.subheader("2. Revisão e Edição (Itens 07 a 12)")
+            st.warning("Abaixo você pode editar os campos gerados pela IA antes de finalizar o documento.")
+            
+            # Campos Editáveis
+            obj = st.text_area("(07) Objetivos Espetíficos", "Defina o que o aluno deve alcançar...")
+            cont = st.text_area("(08) Conteúdos Programáticos", tema)
+            metodo = st.text_area("(09) Metodologia", "Descreva como você vai ensinar (ex: uso de material concreto, tempo estendido)...")
+            avalia = st.text_area("(10) Avaliação", "Como o aluno será avaliado?")
+            resul = st.text_area("(11) Resultados Esperados", "O que se espera que o aluno aprenda ao final?")
+            biblio = st.text_area("(12/13) Bibliografia", "Indique os materiais de apoio.")
+
+            # Montagem do Documento Final (Formatação similar ao Anexo II)
+            pei_final = f"""
+            MINISTÉRIO DA EDUCAÇÃO
+            SECRETARIA DE EDUCAÇÃO PROFISSIONAL E TECNOLÓGICA
+            INSTITUTO FEDERAL DE MATO GROSSO
+            
+            ANEXO II - PLANO EDUCACIONAL INDIVIDUALIZADO (PEI)
+            
+            (01) DADOS PESSOAIS
+            Nome: {aluno['Nome']}
+            Responsável: {aluno['Responsavel']} | Contato: {aluno['Telefone']}
+            Nascimento: {aluno['Nascimento']}
+            Curso: {aluno['Curso']}
+            Componente Curricular: {componente}
+            Docente: {docente}
+            
+            (02) HISTÓRICO
+            {aluno['Historico']}
+            
+            (03) NECESSIDADES EDUCACIONAIS ESPECÍFICAS
+            {aluno['Necessidades']}
+            
+            (04) CONHECIMENTOS/HABILIDADES | (05) DIFICULDADES
+            Habilidades: {aluno['Habilidades']}
+            Dificuldades: {aluno['Dificuldades']}
+            
+            (06) ADAPTAÇÕES RAZOÁVEIS (BASE)
+            {aluno['Adaptacoes_Base']}
+            
+            -----------------------------------------------------------
+            ADAPTAÇÕES ESPECÍFICAS PARA O CONTEÚDO
+            -----------------------------------------------------------
+            
+            (07) OBJETIVOS ESPECÍFICOS
+            {obj}
+            
+            (08) CONTEÚDOS PROGRAMÁTICOS
+            {cont}
+            
+            (09) METODOLOGIA
+            {metodo}
+            
+            (10) AVALIAÇÃO
+            {avalia}
+            
+            (11) RESULTADOS ESPERADOS
+            {resul}
+            
+            (12/13) BIBLIOGRAFIA
+            {biblio}
+            
+            (14) ASSINATURAS
+            Docente: ___________________________ 
+            Coordenação: _______________________ Data: ___/___/___
+            """
+            
+            st.subheader("3. Visualização e Download")
+            st.code(pei_final, language="text")
+            
+            st.download_button(
+                label="📥 Baixar PEI Finalizado (.txt)",
+                data=pei_final,
+                file_name=f"PEI_{aluno_nome}_{componente}.txt",
+                mime="text/plain"
+            )
 
 
