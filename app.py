@@ -4,7 +4,11 @@ import pandas as pd
 import requests
 
 # Configurações da Página
-st.set_page_config(page_title="Sistema PEI - IFMT", layout="wide", page_icon="🌿")
+# Tenta carregar o logo local, se não existir usa o padrão
+try:
+    st.set_page_config(page_title="Sistema PEI - IFMT", layout="wide", page_icon="logo.png")
+except:
+    st.set_page_config(page_title="Sistema PEI - IFMT", layout="wide", page_icon="🌿")
 
 # Estilização IFMT (Verde e Vermelho)
 st.markdown("""
@@ -51,7 +55,7 @@ def call_maritalk(prompt):
             {"role": "user", "content": prompt}
         ],
         "max_tokens": 2000,
-        "temperature": 0.2
+        "temperature": 0.7
     }
     
     try:
@@ -146,4 +150,5 @@ elif page == "Sugestão de Atividades":
 st.sidebar.divider()
 st.sidebar.image("https://ifmt.edu.br/media/filer_public_thumbnails/filer_public/01/0e/010e6e8e-2e6e-4e1e-8e6e-010e6e8e2e6e/logo_ifmt.png__200x200_q85_subsampling-2.png", width=100)
 st.sidebar.caption("Sistema de Apoio à Inclusão - IFMT")
+
 
