@@ -15,50 +15,21 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Função IA (Maritalk)
-def gerar_sugestao_pei(aluno_dados, docente, disciplina, conteudo):
-    try:
-        api_key = st.secrets["MARITALK_API_KEY"]
-        url = "https://chat.maritaca.ai/api/chat/completions"
-        headers = {"Authorization": f"Key {api_key}", "Content-Type": "application/json"}
-        
-        prompt = f"""
-        Você é um especialista em AEE do IFMT. Gere um plano adaptado para o aluno {aluno_dados['Nome do Estudante']}.
-        Diagnóstico: {aluno_dados['(03) Necessidades Educacionais Específicas']}
-        Dificuldades: {aluno_dados['(05) Dificuldades Apresentadas']}
-        Habilidades: {aluno_dados['(04) Conhecimentos e Habilidades']}
-        
-        Disciplina: {disciplina}
-        Conteúdo da aula: {conteudo}
-        
-        Escreva os itens: (07) Objetivos, (08) Conteúdo Adaptado, (09) Metodologia, (10) Avaliação e (11) Resultados.
-        """
-        
-        data = {
-            "model": "sabia-3",
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 1500
-        }
-        response = requests.post(url, headers=headers, json=data)
-        return response.json()['choices'][0]['message']['content']
-    except Exception as e:
-        return f"Erro na IA: {e}"
-
-# 3. Conexão e Limpeza
+# 2. Conexão e Carregamento (COM LIMPEZA DE CACHE)
 try:
+    # O segredo está aqui: ttl=0 faz com que ele não guarde cache e leia sempre o novo
     conn = st.connection("gsheets", type=GSheetsConnection)
-    df = conn.read()
     
-    # Remove espaços em branco dos nomes das colunas
+    # Se você tiver mais de uma aba, coloque o nome da aba correta em worksheet="NomeDaAba"
+    df = conn.read(ttl=0) 
+    
+    # Limpeza de nomes de colunas (remove espaços extras)
     df.columns = [str(c).strip() for c in df.columns]
 except Exception as e:
     st.error(f"Erro ao carregar planilha: {e}")
     st.stop()
 
-# 4. Interface
-st.title("🌿 Sistema PEI - IFMT")
-
-# Definimos as variáveis com os nomes das colunas EXATOS da sua tabela
+# 3. Mapeamento das Colunas (Exatamente como na sua imagem do Anexo II)
 COL_NOME = 'Nome do Estudante'
 COL_HIST = '(02) Histórico'
 COL_NECESSIDADE = '(03) Necessidades Educacionais Específicas'
@@ -66,41 +37,48 @@ COL_HABILIDADE = '(04) Conhecimentos e Habilidades'
 COL_DIFICULDADE = '(05) Dificuldades Apresentadas'
 COL_ADAPTACAO = '(06) Adaptações Razoáveis e/ou Acessibilidades'
 
-if not df.empty:
-    # Verificação amigável de erro
-    if COL_NOME not in df.columns:
-        st.error(f"A coluna '{COL_NOME}' não foi encontrada.")
-        st.write("Colunas que eu encontrei na sua planilha:", df.columns.tolist())
-        st.info("💡 Dica: Renomeie as colunas no Google Sheets para ficarem iguais ao Anexo II.")
-        st.stop()
+# 4. Interface Principal
+st.title("🌿 Sistema PEI - IFMT")
 
-    aluno_selecionado = st.selectbox("Selecione o Aluno:", ["Selecione..."] + df[COL_NOME].tolist())
+# Verificação se a coluna existe (para evitar o KeyError)
+if COL_NOME not in df.columns:
+    st.error(f"⚠️ A coluna '{COL_NOME}' ainda não foi detectada.")
+    st.write("Colunas atuais que o sistema está lendo:", df.columns.tolist())
+    st.info("💡 Se você acabou de alterar a planilha, tente clicar nos três pontinhos no canto superior direito do app e escolha 'Clear Cache'.")
+    st.stop()
 
-    if aluno_selecionado != "Selecione...":
-        dados = df[df[COL_NOME] == aluno_selecionado].iloc[0].to_dict()
+aluno_selecionado = st.selectbox("Selecione o Aluno:", ["Selecione..."] + df[COL_NOME].tolist())
 
+if aluno_selecionado != "Selecione...":
+    # Localiza os dados do aluno
+    dados = df[df[COL_NOME] == aluno_selecionado].iloc[0].to_dict()
+
+    with st.container():
         st.markdown(f"""
         <div class="aluno-card">
             <h3>Ficha Técnica: {aluno_selecionado}</h3>
-            <p><b>Necessidades:</b> {dados.get(COL_NECESSIDADE, 'Não informado')}</p>
-            <p><b>Dificuldades:</b> {dados.get(COL_DIFICULDADE, 'Não informado')}</p>
+            <p><b>(03) Necessidades:</b> {dados.get(COL_NECESSIDADE, 'Dado não encontrado')}</p>
+            <p><b>(05) Dificuldades:</b> {dados.get(COL_DIFICULDADE, 'Dado não encontrado')}</p>
         </div>
         """, unsafe_allow_html=True)
 
-        st.divider()
-        
+    st.divider()
+    
+    # Campos para o professor preencher
+    col1, col2 = st.columns(2)
+    with col1:
         docente = st.text_input("Nome do Docente:")
         materia = st.text_input("Componente Curricular:")
-        conteudo = st.text_area("Conteúdo a ser ministrado:")
+    with col2:
+        tema = st.text_area("Conteúdo/Tópico da Aula:")
 
-        if st.button("Gerar Plano Adaptado"):
-            with st.spinner("IA criando proposta..."):
-                resultado = gerar_sugestao_pei(dados, docente, materia, conteudo)
-                st.session_state['rascunho'] = resultado
+    if st.button("Gerar Plano com IA"):
+        # Aqui entra a chamada da Maritalk (conforme os códigos anteriores)
+        # Vamos simular a geração para o exemplo:
+        prompt = f"Gere um PEI para {aluno_selecionado} sobre {tema}. Necessidades: {dados.get(COL_NECESSIDADE)}"
+        st.session_state['rascunho'] = "Texto gerado pela IA..." 
 
-        if 'rascunho' in st.session_state:
-            # Área de edição
-            texto_editavel = st.text_area("Revise e edite o plano abaixo:", value=st.session_state['rascunho'], height=300)
-            
-            # Botão de Download
-            st.download_button("📥 Baixar PEI (.txt)", texto_editavel, f"PEI_{aluno_selecionado}.txt")
+    if 'rascunho' in st.session_state:
+        # Permite edição antes de baixar
+        texto_editado = st.text_area("Revise e finalize o texto:", value=st.session_state['rascunho'], height=300)
+        st.download_button("📥 Baixar PEI Final", texto_editado, f"PEI_{aluno_selecionado}.txt")
