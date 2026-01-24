@@ -1,4 +1,8 @@
-# app.py — Gerador de PEI (Anexo II) COMPLETO (corrigido: sem texto duplicado + tabela (01) alinhada + download robusto)
+# app.py — Gerador de PEI (Anexo II) COMPLETO
+# ✅ Layout do PDF ajustado (sem duplicação de texto, tabela (01) alinhada)
+# ✅ “Aplicar sugestões da IA” funciona (campos controlados por st.session_state)
+# ✅ Logo IFMT no cabeçalho do PDF: arquivo "images (1).png"
+
 import os
 import io
 import re
@@ -74,12 +78,10 @@ def parse_ia_blocks(text: str) -> dict:
     return out
 
 # =========================================================
-# PDF (Padrão ANEXO II) — CORRIGIDO
-#   - big_box sem duplicar texto (split_only)
-#   - linhas (01) com larguras fixas + ajuste automático de fonte no rótulo
+# PDF (Padrão ANEXO II) — CORRIGIDO + LOGO
 # =========================================================
 class PEI_PDF(FPDF):
-    def __init__(self):
+    def __init__(self, logo_path: str | None = None):
         super().__init__(orientation="P", unit="mm", format="A4")
         self.set_auto_page_break(auto=True, margin=12)
         self.set_margins(12, 12, 12)
@@ -101,7 +103,24 @@ class PEI_PDF(FPDF):
         self.SECTION_H = 7
         self.PAD = 1.6
 
+        self.logo_path = logo_path if logo_path and os.path.exists(logo_path) else None
+
     def header(self):
+        # --- Logo IFMT (centralizado acima do texto) ---
+        if self.logo_path:
+            try:
+                # Coloca no topo, centralizado
+                img_w = 26  # ajuste fino se quiser
+                x = (self.w - img_w) / 2
+                y = 10
+                self.image(self.logo_path, x=x, y=y, w=img_w)
+                self.ln(18)  # espaço abaixo do logo
+            except Exception:
+                # Se der problema com o PNG, apenas ignora
+                self.ln(2)
+        else:
+            self.ln(2)
+
         self.set_font(self.font_bold, "", 10)
         self.cell(0, 5, "Ministério da Educação", ln=True, align="C")
         self.cell(0, 5, "Secretaria de Educação Profissional e Tecnológica", ln=True, align="C")
@@ -133,8 +152,6 @@ class PEI_PDF(FPDF):
             self.set_font(font, "", base)
 
         self.cell(w, h, t, border=border, ln=ln, align=align, fill=fill)
-
-        # volta para o padrão (não “vaza” fonte reduzida)
         self.set_font(self.font_regular, "", 10)
 
     def row_2(self, label, value, label_w=65, h=7):
@@ -188,8 +205,6 @@ class PEI_PDF(FPDF):
             n_lines = max(1, len(lines))
             used_h = n_lines * 5
         except TypeError:
-            # Fallback simples (fpdf antigo)
-            # Estima número de linhas por largura
             avg_chars = max(24, int((w - 2*self.PAD) / 2.2))
             n_lines = 0
             for p in t.split("\n"):
@@ -202,14 +217,9 @@ class PEI_PDF(FPDF):
 
         box_h = max(min_h, used_h + 2*self.PAD + 2)
 
-        # Desenha caixa
         self.rect(x, y, w, box_h)
-
-        # Escreve texto dentro (uma vez!)
         self.set_xy(x + self.PAD, y + self.PAD)
         self.multi_cell(w - 2*self.PAD, 5, t, border=0)
-
-        # Move abaixo
         self.set_xy(x, y + box_h + 2)
 
     def signatures(self):
@@ -233,7 +243,7 @@ class PEI_PDF(FPDF):
             self.ln(1)
 
 # =========================================================
-# PDF download robusto
+# PDF download robusto (Streamlit Cloud-friendly)
 # =========================================================
 def pdf_to_tempfile(pdf: PEI_PDF) -> str:
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
@@ -286,7 +296,23 @@ aluno = aluno_row.to_dict()
 
 st.subheader("📝 Preenchimento do Plano")
 
+# =========================================================
+# CAMPOS CONTROLADOS (STATE) — para “Aplicar IA” funcionar
+# =========================================================
+defaults = {
+    "k_07": "",
+    "k_08": "",
+    "k_09": "",
+    "k_10": "",
+    "k_11": "",
+}
+for k, v in defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+# =========================================================
 # (01) extras
+# =========================================================
 c1, c2, c3 = st.columns(3)
 with c1:
     docente_input = st.text_input("Docente:", value="")
@@ -298,34 +324,36 @@ with c3:
 # (02) Histórico editável
 texto_historico = st.text_area("(02) Histórico (Edite se necessário):", value=s(aluno.get(COL_HIST, "")), height=120)
 
-# (03)-(06) — edição opcional (mas default vem da planilha)
+# (03)-(06) — edição opcional
 with st.expander("Ver/editar (03) a (06) (opcional)", expanded=False):
     necessidade_03 = st.text_area("(03) Necessidades Educacionais Específicas:", value=s(aluno.get(COL_NECESSIDADE, "")), height=90)
     hab_04 = st.text_area("(04) Conhecimentos e Habilidades:", value=s(aluno.get(COL_HAB, "")), height=90)
     dif_05 = st.text_area("(05) Dificuldades Apresentadas:", value=s(aluno.get(COL_DIF, "")), height=90)
     adapt_06 = st.text_area("(06) Adaptações Razoáveis/Acessibilidades:", value=s(aluno.get(COL_ADAPT, "")), height=90)
 
-# Se o expander não foi aberto (variáveis não existem), use defaults do aluno
 necessidade_val = locals().get("necessidade_03", s(aluno.get(COL_NECESSIDADE, "")))
 hab_val = locals().get("hab_04", s(aluno.get(COL_HAB, "")))
 dif_val = locals().get("dif_05", s(aluno.get(COL_DIF, "")))
 adapt_val = locals().get("adapt_06", s(aluno.get(COL_ADAPT, "")))
 
-# (07)-(11)
+# =========================================================
+# (07)-(11) — CONTROLADOS POR SESSION_STATE
+# =========================================================
 st.markdown("### Desenvolvimento pedagógico (07)–(11)")
-conteudo_input = st.text_area("(08) Conteúdos Programáticos:", height=90)
+
+st.text_area("(08) Conteúdos Programáticos:", height=90, key="k_08")
 
 colA, colB = st.columns(2)
 with colA:
-    objetivos_07 = st.text_area("(07) Objetivos Específicos:", height=140)
-    metodologia_09 = st.text_area("(09) Metodologia:", height=140)
+    st.text_area("(07) Objetivos Específicos:", height=140, key="k_07")
+    st.text_area("(09) Metodologia:", height=140, key="k_09")
 with colB:
-    avaliacao_10 = st.text_area("(10) Avaliação:", height=140)
-    resultados_11 = st.text_area("(11) Resultados Esperados:", height=140)
+    st.text_area("(10) Avaliação:", height=140, key="k_10")
+    st.text_area("(11) Resultados Esperados:", height=140, key="k_11")
 
 # IA
 if st.button("🚀 Gerar Sugestões (IA) para (07), (09), (10) e (11)"):
-    if not materia_input or not conteudo_input:
+    if not materia_input or not st.session_state["k_08"].strip():
         st.warning("Preencha 'Componente Curricular' e '(08) Conteúdos Programáticos' para a IA sugerir.")
     else:
         prompt = f"""
@@ -346,7 +374,7 @@ Necessidades (03): {necessidade_val}
 Habilidades (04): {hab_val}
 Dificuldades (05): {dif_val}
 Adaptações (06): {adapt_val}
-Conteúdos (08): {conteudo_input}
+Conteúdos (08): {st.session_state["k_08"]}
 """
         ia_raw = call_maritalk(prompt)
         st.session_state["ia_raw"] = ia_raw
@@ -362,14 +390,16 @@ if "ia_raw" in st.session_state:
 if any(k in st.session_state for k in ["ia_07", "ia_09", "ia_10", "ia_11"]):
     if st.button("✅ Aplicar sugestões da IA nos campos"):
         if st.session_state.get("ia_07"):
-            objetivos_07 = st.session_state["ia_07"]
+            st.session_state["k_07"] = st.session_state["ia_07"]
         if st.session_state.get("ia_09"):
-            metodologia_09 = st.session_state["ia_09"]
+            st.session_state["k_09"] = st.session_state["ia_09"]
         if st.session_state.get("ia_10"):
-            avaliacao_10 = st.session_state["ia_10"]
+            st.session_state["k_10"] = st.session_state["ia_10"]
         if st.session_state.get("ia_11"):
-            resultados_11 = st.session_state["ia_11"]
-        st.success("Sugestões aplicadas. Revise e gere o PDF.")
+            st.session_state["k_11"] = st.session_state["ia_11"]
+
+        st.success("Sugestões aplicadas.")
+        st.rerun()
 
 # (12)-(13)
 b1, b2 = st.columns(2)
@@ -382,27 +412,34 @@ with b2:
 # GERAR PDF
 # =========================================================
 st.markdown("---")
-st.subheader("📄 PDF no padrão do Anexo II (corrigido)")
+st.subheader("📄 PDF no padrão do Anexo II (com logo IFMT)")
 
 use_tempfile = st.checkbox("Modo ultra-robusto (arquivo temporário) — recomendado na Streamlit Cloud", value=True)
 
+# Caminho do logo (arquivo no mesmo diretório do app.py)
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+LOGO_PATH = os.path.join(APP_DIR, "images (1).png")  # <- seu arquivo
+
 if st.button("📌 Montar PDF"):
-    pdf = PEI_PDF()
+    pdf = PEI_PDF(logo_path=LOGO_PATH)
     pdf.add_page()
 
-    # (01) — tabela alinhada (sem “invadir”)
+    # (01) — tabela alinhada
     pdf.section_bar("(01) DADOS PESSOAIS")
     pdf.row_2("Nome do Estudante:", s(aluno.get(COL_NOME)))
 
     pdf.row_4("Nome do Pai/Mãe ou responsável:", s(aluno.get(COL_RESP)), "Obs.:", obs_input, w1=65, w3=18)
 
-    pdf.row_4_custom("Telefone para contato:", s(aluno.get(COL_TEL)), "Data do Nascimento:", s(aluno.get(COL_NASC)), w1=65, w2=70, w3=45)
+    pdf.row_4_custom("Telefone para contato:", s(aluno.get(COL_TEL)), "Data do Nascimento:", s(aluno.get(COL_NASC)),
+                     w1=65, w2=70, w3=45)
 
-    pdf.row_4_custom("Idade:", s(aluno.get(COL_IDADE)), "Curso:", s(aluno.get(COL_CURSO)), w1=65, w2=70, w3=45)
+    pdf.row_4_custom("Idade:", s(aluno.get(COL_IDADE)), "Curso:", s(aluno.get(COL_CURSO)),
+                     w1=65, w2=70, w3=45)
 
-    pdf.row_4_custom("Componente Curricular:", materia_input, "Docente:", docente_input, w1=65, w2=70, w3=45)
+    pdf.row_4_custom("Componente Curricular:", materia_input, "Docente:", docente_input,
+                     w1=65, w2=70, w3=45)
 
-    # (02) — sem duplicar texto
+    # (02) — sem duplicação
     pdf.section_bar("(02) HISTÓRICO (ANTERIOR, EM INSTITUIÇÃO DE ORIGEM ATÉ A ATUALIDADE)")
     pdf.big_box(texto_historico, min_h=28)
 
@@ -419,21 +456,21 @@ if st.button("📌 Montar PDF"):
     pdf.section_bar("(06) ADAPTAÇÕES RAZOÁVEIS E/OU ACESSIBILIDADES CURRICULARES")
     pdf.big_box(adapt_val, min_h=20)
 
-    # (07)–(11)
+    # (07)–(11) — lê do session_state
     pdf.section_bar("(07) OBJETIVOS ESPECÍFICOS")
-    pdf.big_box(objetivos_07, min_h=18)
+    pdf.big_box(st.session_state["k_07"], min_h=18)
 
     pdf.section_bar("(08) CONTEÚDOS PROGRAMÁTICOS")
-    pdf.big_box(conteudo_input, min_h=18)
+    pdf.big_box(st.session_state["k_08"], min_h=18)
 
     pdf.section_bar("(09) METODOLOGIA")
-    pdf.big_box(metodologia_09, min_h=18)
+    pdf.big_box(st.session_state["k_09"], min_h=18)
 
     pdf.section_bar("(10) AVALIAÇÃO")
-    pdf.big_box(avaliacao_10, min_h=18)
+    pdf.big_box(st.session_state["k_10"], min_h=18)
 
     pdf.section_bar("(11) RESULTADOS ESPERADOS")
-    pdf.big_box(resultados_11, min_h=18)
+    pdf.big_box(st.session_state["k_11"], min_h=18)
 
     # (12)–(13)
     pdf.section_bar("(12) BIBLIOGRAFIA BÁSICA")
@@ -456,7 +493,6 @@ if st.button("📌 Montar PDF"):
                 mime="application/pdf",
             )
     else:
-        # BytesIO (também seguro)
         out = pdf.output(dest="S")
         if isinstance(out, str):
             pdf_bytes = out.encode("latin-1", errors="replace")
@@ -471,6 +507,5 @@ if st.button("📌 Montar PDF"):
         )
 
     st.success("PDF montado! Use o botão de download acima.")
-
 
 
