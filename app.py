@@ -90,6 +90,6 @@ except Exception as e:
     with st.expander("Exemplo de configuração do Secrets"):
         st.code("""
 [connections.gsheets]
-spreadsheet = "https://docs.google.com/spreadsheets/d/SUA_PLANILHA_ID"
+spreadsheet = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSLdIOk6kHNFJWNZ5RLqKOC0Mz_oSMKAiGhDx3F1FYSjGWydaYU7uO2RPBNZDcsTAaWb9iRREUDgtpd/pubhtml"
         """)
 
