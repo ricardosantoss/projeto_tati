@@ -51,7 +51,7 @@ def call_maritalk(prompt):
             {"role": "user", "content": prompt}
         ],
         "max_tokens": 2000,
-        "temperature": 0.7
+        "temperature": 0.2
     }
     
     try:
