@@ -4,92 +4,146 @@ import pandas as pd
 import requests
 
 # Configurações da Página
-st.set_page_config(page_title="Gerador de PEI - Maritalk", layout="wide")
+st.set_page_config(page_title="Sistema PEI - IFMT", layout="wide", page_icon="🌿")
 
-# Título e Descrição
-st.title("📝 Gerador de PEI (Tabela Google Sheets)")
+# Estilização IFMT (Verde e Vermelho)
 st.markdown("""
-Este app conecta diretamente à sua planilha do Google Sheets. 
-Você pode visualizar os alunos na tabela abaixo e gerar o PEI usando o Maritalk.
-""")
+    <style>
+    .main {
+        background-color: #f5f5f5;
+    }
+    .stButton>button {
+        background-color: #2f9e41;
+        color: white;
+        border-radius: 5px;
+    }
+    .stSidebar {
+        background-color: #ffffff;
+    }
+    h1 {
+        color: #2f9e41;
+        border-bottom: 2px solid #ed1c24;
+    }
+    .aluno-card {
+        background-color: white;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 5px solid #2f9e41;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-# Sidebar para Configurações de API
-with st.sidebar:
-    st.header("Configurações")
-    api_key = st.text_input("Maritalk API Key", type="password", help="Insira sua chave da API Maritalk")
+# Função para chamar Maritalk (usando Secrets)
+def call_maritalk(prompt):
+    try:
+        api_key = st.secrets["MARITALK_API_KEY"]
+    except:
+        st.error("Erro: Chave MARITALK_API_KEY não configurada nos Secrets.")
+        return None
+
+    url = "https://chat.maritaca.ai/api/chat/completions"
+    headers = {"Authorization": f"Key {api_key}", "Content-Type": "application/json"}
+    data = {
+        "model": "sabia-3",
+        "messages": [
+            {"role": "system", "content": "Você é um especialista em educação inclusiva do IFMT. Ajude professores a criarem PEIs e atividades adaptadas."},
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 2000,
+        "temperature": 0.7
+    }
     
-    st.divider()
-    st.info("""
-    **Como conectar o Sheets:**
-    No Streamlit Cloud, você precisará configurar o `secrets.toml` com a URL da sua planilha.
-    """)
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code == 200:
+            return response.json()['choices'][0]['message']['content']
+        else:
+            return f"Erro na API: {response.text}"
+    except Exception as e:
+        return f"Erro de conexão: {e}"
+
+# Navegação
+page = st.sidebar.radio("Navegação", ["Gerador de PEI", "Sugestão de Atividades"])
 
 # Conexão com Google Sheets
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-    # Tenta ler a planilha configurada nos secrets ou via parâmetro
     df = conn.read()
-    
-    if df is not None:
-        st.subheader("📋 Tabela de Alunos")
-        
-        # Exibe a tabela (editável se desejar, mas aqui apenas visualização)
-        st.dataframe(df, use_container_width=True)
-        
-        st.divider()
-        
-        # Seleção de Aluno para PEI
-        if 'Nome' in df.columns:
-            col1, col2 = st.columns([1, 2])
-            
-            with col1:
-                st.subheader("Gerar Plano")
-                aluno_selecionado = st.selectbox("Selecione o aluno:", df['Nome'].tolist())
-                btn_gerar = st.button("Gerar PEI com Maritalk")
-            
-            if btn_gerar:
-                if not api_key:
-                    st.warning("⚠️ Insira sua API Key do Maritalk na barra lateral.")
-                else:
-                    aluno_info = df[df['Nome'] == aluno_selecionado].iloc[0].to_dict()
-                    
-                    with st.spinner(f"🤖 Maritalk processando PEI para {aluno_selecionado}..."):
-                        # Função de chamada à API (mesma lógica anterior)
-                        url = "https://chat.maritaca.ai/api/chat/completions"
-                        headers = {"Authorization": f"Key {api_key}", "Content-Type": "application/json"}
-                        
-                        prompt = f"Gere um PEI detalhado para o aluno: {aluno_info}. Inclua objetivos, adaptações e estratégias."
-                        
-                        data = {
-                            "model": "sabia-3",
-                            "messages": [
-                                {"role": "system", "content": "Você é um especialista em educação inclusiva."},
-                                {"role": "user", "content": prompt}
-                            ],
-                            "max_tokens": 2000
-                        }
-                        
-                        try:
-                            response = requests.post(url, headers=headers, json=data)
-                            if response.status_code == 200:
-                                resultado = response.json()['choices'][0]['message']['content']
-                                with col2:
-                                    st.markdown("### PEI Gerado")
-                                    st.markdown(resultado)
-                                    st.download_button("Baixar PEI", resultado, f"PEI_{aluno_selecionado}.md")
-                            else:
-                                st.error(f"Erro na API: {response.text}")
-                        except Exception as e:
-                            st.error(f"Erro de conexão: {e}")
-        else:
-            st.error("A planilha precisa ter uma coluna chamada 'Nome'.")
-
 except Exception as e:
-    st.warning("Aguardando configuração da conexão com Google Sheets.")
-    st.info("Para testar localmente, adicione a URL da planilha no arquivo `.streamlit/secrets.toml`.")
-    with st.expander("Exemplo de configuração do Secrets"):
-        st.code("""
-[connections.gsheets]
-spreadsheet = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSLdIOk6kHNFJWNZ5RLqKOC0Mz_oSMKAiGhDx3F1FYSjGWydaYU7uO2RPBNZDcsTAaWb9iRREUDgtpd/pubhtml"
-        """)
+    st.error("Erro ao conectar com a planilha. Verifique os Secrets.")
+    st.stop()
+
+if page == "Gerador de PEI":
+    st.title("🌿 Gerador de PEI - IFMT")
+    
+    if 'Nome' in df.columns:
+        aluno_nome = st.selectbox("Selecione o Aluno:", ["Selecione..."] + df['Nome'].tolist())
+        
+        if aluno_nome != "Selecione...":
+            aluno_info = df[df['Nome'] == aluno_nome].iloc[0].to_dict()
+            
+            # Mostra dados apenas após seleção
+            with st.container():
+                st.markdown(f"""
+                <div class="aluno-card">
+                    <h3>Dados do Aluno: {aluno_nome}</h3>
+                    <p><b>Diagnóstico:</b> {aluno_info.get('Diagnóstico', 'N/A')}</p>
+                    <p><b>Dificuldades:</b> {aluno_info.get('Dificuldades', 'N/A')}</p>
+                    <p><b>Pontos Fortes:</b> {aluno_info.get('Pontos Fortes', 'N/A')}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.divider()
+            
+            conteudo = st.text_area("Conteúdo/Tópico a ser ministrado:", placeholder="Ex: Equações do 2º grau, Revolução Francesa...")
+            
+            if st.button("Gerar PEI Adaptado"):
+                if not conteudo:
+                    st.warning("Por favor, informe o conteúdo que será ministrado.")
+                else:
+                    prompt = f"""
+                    Gere um PEI (Plano de Ensino Individualizado) para o aluno {aluno_nome}.
+                    Dados do aluno: {aluno_info}
+                    Conteúdo a ser ministrado: {conteudo}
+                    
+                    O plano deve focar em como adaptar este conteúdo específico para as necessidades do aluno.
+                    """
+                    with st.spinner("Gerando PEI..."):
+                        resultado = call_maritalk(prompt)
+                        if resultado:
+                            st.markdown("### 📄 PEI Sugerido")
+                            st.markdown(resultado)
+                            st.download_button("Baixar PEI (Markdown)", resultado, f"PEI_{aluno_nome}.md")
+    else:
+        st.error("Coluna 'Nome' não encontrada na planilha.")
+
+elif page == "Sugestão de Atividades":
+    st.title("💡 Sugestão de Atividades Adaptadas")
+    
+    aluno_nome = st.selectbox("Selecione o Aluno para a atividade:", ["Selecione..."] + df['Nome'].tolist())
+    
+    if aluno_nome != "Selecione...":
+        aluno_info = df[df['Nome'] == aluno_nome].iloc[0].to_dict()
+        conteudo_atv = st.text_input("Qual o tema da atividade?", placeholder="Ex: Frações, Ecossistemas...")
+        
+        if st.button("Propor Atividades"):
+            if not conteudo_atv:
+                st.warning("Informe o tema da atividade.")
+            else:
+                prompt_atv = f"""
+                Com base no perfil do aluno {aluno_nome} ({aluno_info}), 
+                proponha 3 atividades práticas e adaptadas sobre o tema: {conteudo_atv}.
+                As atividades devem ser inclusivas e considerar os pontos fortes do aluno.
+                """
+                with st.spinner("Criando sugestões..."):
+                    resultado_atv = call_maritalk(prompt_atv)
+                    if resultado_atv:
+                        st.markdown(resultado_atv)
+                        st.download_button("Baixar Sugestões", resultado_atv, f"Atividades_{aluno_nome}.md")
+
+# Rodapé
+st.sidebar.divider()
+st.sidebar.image("https://ifmt.edu.br/media/filer_public_thumbnails/filer_public/01/0e/010e6e8e-2e6e-4e1e-8e6e-010e6e8e2e6e/logo_ifmt.png__200x200_q85_subsampling-2.png", width=100)
+st.sidebar.caption("Sistema de Apoio à Inclusão - IFMT")
 
