@@ -139,30 +139,13 @@ class PEI_PDF(FPDF):
 # =========================================================
 # INTERFACE STREAMLIT
 # =========================================================
-import streamlit as st
-
-# Criamos 3 colunas. Aumentar o peso das laterais ajuda a centralizar melhor o miolo.
-col_esq, col_centro, col_dir = st.columns([2, 2, 2])
-
 with col_centro:
-    # 1. Centralização da imagem usando st.image
-    # O truque é colocar a imagem e o texto dentro do mesmo container
-    st.image("ifmt_barra.png", width=60) 
-
-    # 2. Texto com margem negativa para aproximar da imagem
-    st.markdown(
-        """
-        <style>
-            .titulo-central {
-                text-align: center;
-                margin-top: -20px; /* Puxa o texto para cima, mais perto da logo */
-                font-family: sans-serif;
-            }
-        </style>
-        <h3 class='titulo-central'>Gerador de PEI - IFMT</h3>
-        """,
-        unsafe_allow_html=True
-    )
+    # Cria um alinhamento visual forçado
+    inner_col_1, inner_col_2, inner_col_3 = st.columns([1, 2, 1])
+    with inner_col_2:
+        st.image("ifmt_barra.png", width=50)
+    
+    st.markdown("<h3 style='text-align: center; margin-top: -10px;'>Gerador de PEI - IFMT</h3>", unsafe_allow_html=True)
 
 
 # Carregamento de dados simplificado
