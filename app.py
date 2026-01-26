@@ -142,7 +142,7 @@ class PEI_PDF(FPDF):
 st.markdown(
     """
     <div style="text-align:center">
-        <img src="ifmt_barra.png" width="180">
+        <img src="ifmt_barra.jpg" width="180">
         <h2>Gerador de PEI Oficial - IFMT</h2>
     </div>
     """,
