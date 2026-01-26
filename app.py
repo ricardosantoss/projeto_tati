@@ -13,11 +13,13 @@ from streamlit_gsheets import GSheetsConnection
 # =========================================================
 st.set_page_config(page_title="Gerador PEI - IFMT", layout="wide")
 
+
 def init_session_keys():
     keys = ["k_07", "k_08", "k_09", "k_10", "k_11", "ia_raw"]
     for k in keys:
         if k not in st.session_state:
             st.session_state[k] = ""
+
 
 init_session_keys()
 
@@ -50,8 +52,14 @@ def safe_pdf_text(s: str) -> str:
     s = s.replace("\r\n", "\n").replace("\r", "\n")
 
     # garante compatibilidade com cp1252
-    s = s.encode("cp1252", errors="replace").decode("cp1252")
+    try:
+        s = s.encode("cp1252", errors="replace").decode("cp1252")
+    except Exception:
+        # fallback extremo
+        s = s.encode("latin-1", errors="replace").decode("latin-1")
+
     return s
+
 
 # =========================================================
 # LÓGICA DE IA (SABIA-3)
@@ -73,26 +81,35 @@ def call_maritalk(prompt: str) -> str:
     except Exception as e:
         return f"Erro na API: {e}"
 
+
 def parse_and_apply_ia(text: str):
     """Extrai os blocos e já injeta no session_state."""
     patterns = {
         "k_07": r"(?i)(?:\(?0?7\)?|0?7\s*[-:])\s*(.*?)(?=\(?0?9\)?|0?9\s*[-:]|$)",
         "k_09": r"(?i)(?:\(?0?9\)?|0?9\s*[-:])\s*(.*?)(?=\(?10\)?|10\s*[-:]|$)",
         "k_10": r"(?i)(?:\(?10\)?|10\s*[-:])\s*(.*?)(?=\(?11\)?|11\s*[-:]|$)",
-        "k_11": r"(?i)(?:\(?11\)?|11\s*[-:])\s*(.*?)(?=$)"
+        "k_11": r"(?i)(?:\(?11\)?|11\s*[-:])\s*(.*?)(?=$)",
     }
     for key, p in patterns.items():
         match = re.search(p, text, re.DOTALL)
         if match:
             st.session_state[key] = match.group(1).strip()
 
+
 # =========================================================
-# PDF PADRÃO ANEXO II (corrigido: cp1252 + safe_pdf_text)
+# PDF PADRÃO ANEXO II (compatível fpdf2 e fpdf antigo)
 # =========================================================
 class PEI_PDF(FPDF):
     def __init__(self, *args, **kwargs):
-        # cp1252 amplia compatibilidade com símbolos comuns (• “ ” — etc.)
-        super().__init__(*args, core_fonts_encoding="cp1252", **kwargs)
+        """
+        Tenta usar core_fonts_encoding=cp1252 (fpdf2).
+        Se estiver rodando com fpdf antigo, cai no fallback sem esse argumento.
+        """
+        try:
+            super().__init__(*args, core_fonts_encoding="cp1252", **kwargs)
+        except TypeError:
+            super().__init__(*args, **kwargs)
+
         self.set_auto_page_break(auto=True, margin=12)
 
     def header(self):
@@ -118,6 +135,7 @@ class PEI_PDF(FPDF):
         self.multi_cell(0, 6, text, border=1, align="L")
         self.ln(1)
 
+
 # =========================================================
 # INTERFACE STREAMLIT
 # =========================================================
@@ -128,9 +146,12 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 df = conn.read()
 df.columns = [str(c).strip() for c in df.columns]
 
+# Evita erro se a coluna tiver NaN
+nomes = df["Nome do Estudante"].dropna().unique().tolist()
+
 aluno_nome = st.selectbox(
     "Selecione o Estudante:",
-    ["Selecione..."] + df["Nome do Estudante"].dropna().unique().tolist()
+    ["Selecione..."] + nomes,
 )
 
 if aluno_nome != "Selecione...":
@@ -142,24 +163,25 @@ if aluno_nome != "Selecione...":
         docente = col1.text_input("Docente:", placeholder="Nome do Professor")
         disciplina = col2.text_input("Componente Curricular:", placeholder="Nome da Disciplina")
 
+        # Preenchimento automático da planilha (mantido)
         obs = st.text_input("Obs.:", value=str(aluno.get("Obs.", "")))
 
     # (02) HISTÓRICO
     hist_txt = st.text_area(
         "(02) Histórico (Origem até a atualidade):",
         value=str(aluno.get("(02) Histórico", "")),
-        height=80
+        height=80,
     )
 
     # (03) e (04)
     col_a, col_b = st.columns(2)
     nec_val = col_a.text_area(
         "(03) Necessidades Educacionais:",
-        value=str(aluno.get("(03) Necessidades Educacionais Específicas", ""))
+        value=str(aluno.get("(03) Necessidades Educacionais Específicas", "")),
     )
     hab_val = col_b.text_area(
         "(04) Conhecimentos e Habilidades:",
-        value=str(aluno.get("(04) Conhecimentos e Habilidades", ""))
+        value=str(aluno.get("(04) Conhecimentos e Habilidades", "")),
     )
 
     # (08) CONTEÚDO
@@ -255,10 +277,17 @@ if aluno_nome != "Selecione...":
         pdf.cell(0, 6, safe_pdf_text("Assinatura do Departamento de Ensino"), ln=True)
 
         # DOWNLOAD (sem arquivo em disco)
-        pdf_bytes = pdf.output(dest="S").encode("latin1", errors="replace")
+        # fpdf2: output(dest="S") -> str; fpdf antigo: pode ser bytes/str dependendo da versão
+        pdf_out = pdf.output(dest="S")
+        if isinstance(pdf_out, str):
+            pdf_bytes = pdf_out.encode("latin-1", errors="replace")
+        else:
+            pdf_bytes = bytes(pdf_out)
+
         st.download_button(
             "Clique aqui para baixar o PDF",
             data=pdf_bytes,
             file_name=f"PEI_{aluno_nome}.pdf",
-            mime="application/pdf"
+            mime="application/pdf",
         )
+
