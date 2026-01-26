@@ -516,3 +516,10 @@ AGORA GERE A SAÍDA NO FORMATO EXATO.
             mime="application/pdf",
             key="dl_ativ",
         )
+
+st.markdown("""
+<hr style="margin-top: 30px; margin-bottom: 10px;">
+<p style="text-align:center; color: #64748b; font-size: 13px; margin: 0;">
+Protótipo desenvolvido por <b>Ricardo da Silva Santos</b> e <b>Tatiane Felipe Lopes</b>.
+</p>
+""", unsafe_allow_html=True)
