@@ -142,11 +142,17 @@ class PEI_PDF(FPDF):
 col_esq, col_centro, col_dir = st.columns([2, 3, 2])
 
 with col_centro:
-    st.image("ifmt_barra.png", width=80)
+    # Centraliza a imagem usando um "container" HTML
+    st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
+    st.image("ifmt_barra.png", width=70)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Centraliza o título
     st.markdown(
-        "<h3 style='text-align: center;'>Gerador de PEI - IFMT</h3>",
+        "<h3 style='text-align:center; margin-top: 8px;'>Gerador de PEI - IFMT</h3>",
         unsafe_allow_html=True
     )
+
 
 # Carregamento de dados simplificado
 conn = st.connection("gsheets", type=GSheetsConnection)
