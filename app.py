@@ -139,23 +139,34 @@ class PEI_PDF(FPDF):
 # =========================================================
 # INTERFACE STREAMLIT
 # =========================================================
-# Criamos 3 colunas, a central é onde tudo acontece
-col_esq, col_centro, col_dir = st.columns([2, 3, 2])
+import streamlit as st
+
+# 1. Injeção de CSS para centralizar o widget de imagem globalmente
+st.markdown("""
+    <style>
+    /* Alinha o container da imagem ao centro */
+    [data-testid="stImage"] {
+        display: flex;
+        justify-content: center;
+    }
+    /* Remove o excesso de espaço abaixo da imagem e ajusta o título */
+    .titulo-header {
+        text-align: center;
+        margin-top: -15px !important; /* Ajuste aqui para colar mais ou menos na imagem */
+        font-weight: bold;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# 2. Estrutura de colunas (o 1, 2, 1 ajuda a dar foco ao centro)
+col_esq, col_centro, col_dir = st.columns([1, 2, 1])
 
 with col_centro:
-    # Usamos o parâmetro use_container_width=False e centralizamos via Markdown
-    # O truque aqui é usar o st.columns apenas se quiser imagem AO LADO do texto.
-    # Se for ACIMA, não use colunas internas.
+    # A imagem agora será centralizada pelo CSS acima
+    st.image("ifmt_barra.png", width=70)
     
-    # Centralização manual da imagem via CSS
-    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-    st.image("ifmt_barra.png", width=70) # Aumentei um pouco para facilitar o ajuste
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown(
-        "<h3 style='text-align: center; margin-top: -50px;'>Gerador de PEI - IFMT</h3>",
-        unsafe_allow_html=True
-    )
+    # O título com a classe que definimos no CSS
+    st.markdown("<h3 class='titulo-header'>Gerador de PEI - IFMT</h3>", unsafe_allow_html=True)
 
 
 # Carregamento de dados simplificado
