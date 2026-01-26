@@ -1,7 +1,6 @@
 import os
 import io
 import re
-import tempfile
 import requests
 import pandas as pd
 import streamlit as st
@@ -9,13 +8,24 @@ from fpdf import FPDF
 from streamlit_gsheets import GSheetsConnection
 
 # =========================================================
-# CONFIG E ESTADO
+# CONFIG
 # =========================================================
-st.set_page_config(page_title="Gerador PEI - IFMT", layout="wide")
+st.set_page_config(page_title="Gerador PEI / Atividades - IFMT", layout="wide")
 
 
+# =========================================================
+# SESSION STATE
+# =========================================================
 def init_session_keys():
-    keys = ["k_07", "k_08", "k_09", "k_10", "k_11", "ia_raw"]
+    keys = [
+        # PEI
+        "k_07", "k_08_pei", "k_09", "k_10", "k_11", "ia_raw",
+        # ATIVIDADES
+        "k_08_ativ", "k_12_ativ", "ia_ativ_raw",
+        # UI
+        "aluno_pei", "aluno_ativ", "docente_pei", "disciplina_pei",
+        "docente_ativ", "disciplina_ativ",
+    ]
     for k in keys:
         if k not in st.session_state:
             st.session_state[k] = ""
@@ -23,14 +33,11 @@ def init_session_keys():
 
 init_session_keys()
 
+
 # =========================================================
 # SANITIZAÇÃO DE TEXTO PARA PDF (sem fontes externas)
 # =========================================================
 def safe_pdf_text(s: str) -> str:
-    """
-    Normaliza caracteres comuns que quebram o FPDF com core fonts,
-    e garante que a string final é codificável em cp1252.
-    """
     if s is None:
         return ""
     s = str(s)
@@ -51,11 +58,9 @@ def safe_pdf_text(s: str) -> str:
 
     s = s.replace("\r\n", "\n").replace("\r", "\n")
 
-    # garante compatibilidade com cp1252
     try:
         s = s.encode("cp1252", errors="replace").decode("cp1252")
     except Exception:
-        # fallback extremo
         s = s.encode("latin-1", errors="replace").decode("latin-1")
 
     return s
@@ -83,7 +88,7 @@ def call_maritalk(prompt: str) -> str:
 
 
 def parse_and_apply_ia(text: str):
-    """Extrai os blocos e já injeta no session_state."""
+    """Extrai os blocos 07/09/10/11 e injeta no session_state (PEI)."""
     patterns = {
         "k_07": r"(?i)(?:\(?0?7\)?|0?7\s*[-:])\s*(.*?)(?=\(?0?9\)?|0?9\s*[-:]|$)",
         "k_09": r"(?i)(?:\(?0?9\)?|0?9\s*[-:])\s*(.*?)(?=\(?10\)?|10\s*[-:]|$)",
@@ -96,32 +101,30 @@ def parse_and_apply_ia(text: str):
             st.session_state[key] = match.group(1).strip()
 
 
+def parse_and_apply_activities(text: str):
+    """Extrai o bloco 12 e injeta no session_state (ATIVIDADES)."""
+    p = r"(?is)(?:\(?12\)?|12\s*[-:])\s*(.*?)(?=$)"
+    m = re.search(p, text, re.DOTALL)
+    if m:
+        st.session_state["k_12_ativ"] = m.group(1).strip()
+
+
 # =========================================================
-# PDF PADRÃO ANEXO II (compatível fpdf2 e fpdf antigo)
+# PDF (FPDF compatível fpdf2 e fpdf antigo)
 # =========================================================
-class PEI_PDF(FPDF):
+class BasePDF(FPDF):
     def __init__(self, *args, **kwargs):
-        """
-        Tenta usar core_fonts_encoding=cp1252 (fpdf2).
-        Se estiver rodando com fpdf antigo, cai no fallback sem esse argumento.
-        """
         try:
             super().__init__(*args, core_fonts_encoding="cp1252", **kwargs)
         except TypeError:
             super().__init__(*args, **kwargs)
-
         self.set_auto_page_break(auto=True, margin=12)
 
-    def header(self):
+    def header_brand(self):
         self.set_font("Arial", "B", 10)
         self.cell(0, 5, safe_pdf_text("Ministério da Educação"), ln=True, align="C")
         self.cell(0, 5, safe_pdf_text("Secretaria de Educação Profissional e Tecnológica"), ln=True, align="C")
         self.cell(0, 5, safe_pdf_text("Instituto Federal de Educação, Ciência e Tecnologia de Mato Grosso"), ln=True, align="C")
-        self.ln(5)
-
-        self.set_font("Arial", "B", 12)
-        self.cell(0, 7, safe_pdf_text("ANEXO II"), ln=True, align="C")
-        self.cell(0, 7, safe_pdf_text("PLANO EDUCACIONAL INDIVIDUALIZADO (PEI)"), ln=True, align="C")
         self.ln(5)
 
     def section_header(self, title):
@@ -129,260 +132,368 @@ class PEI_PDF(FPDF):
         self.set_fill_color(240, 240, 240)
         self.cell(0, 8, safe_pdf_text(f" {title}"), border=1, ln=True, fill=True)
 
-    def info_box(self, content, min_h=10):
+    def info_box(self, content):
         self.set_font("Arial", "", 10)
         text = safe_pdf_text(content)
         self.multi_cell(0, 6, text, border=1, align="L")
         self.ln(1)
 
 
-# =========================================================
-# INTERFACE STREAMLIT
-# =========================================================
+class PEI_PDF(BasePDF):
+    def header(self):
+        self.header_brand()
+        self.set_font("Arial", "B", 12)
+        self.cell(0, 7, safe_pdf_text("ANEXO II"), ln=True, align="C")
+        self.cell(0, 7, safe_pdf_text("PLANO EDUCACIONAL INDIVIDUALIZADO (PEI)"), ln=True, align="C")
+        self.ln(5)
 
-import streamlit as st
 
-# 1. CSS para forçar a centralização do componente de imagem do Streamlit
+class ATIV_PDF(BasePDF):
+    def header(self):
+        self.header_brand()
+        self.set_font("Arial", "B", 12)
+        self.cell(0, 7, safe_pdf_text("SUGESTÕES DE ATIVIDADES"), ln=True, align="C")
+        self.ln(5)
+
+
+def pdf_bytes(pdf: FPDF) -> bytes:
+    out = pdf.output(dest="S")
+    if isinstance(out, str):
+        return out.encode("latin-1", errors="replace")
+    return bytes(out)
+
+
+# =========================================================
+# UI - CABEÇALHO
+# =========================================================
 st.markdown("""
-    <style>
-    /* Alinha o container da imagem no centro da coluna */
-    [data-testid="stImage"] {
-        display: flex;
-        justify-content: center;
-    }
-    </style>
+<style>
+[data-testid="stImage"] { display: flex; justify-content: center; }
+</style>
 """, unsafe_allow_html=True)
 
-# 2. Criamos 3 colunas (a proporção 1, 2, 1 foca bem o conteúdo no meio)
 col_esq, col_centro, col_dir = st.columns([1, 2, 1])
-
 with col_esq:
-    # Usamos st.image para carregar o arquivo local (evita o erro da imagem quebrada)
-    st.image("ifmt_barra.png", width=100) 
-
+    st.image("ifmt_barra.png", width=100)
 
 with col_centro:
+    st.markdown("<h3 style='text-align:center; margin-top:5px;'>Gerador de PEI / Atividades - IFMT</h3>",
+                unsafe_allow_html=True)
 
-    # Texto centralizado com margem ajustada
-    st.markdown(
-        "<h3 style='text-align: center; margin-top: 5px;'>Gerador de PEI - IFMT</h3>", 
-        unsafe_allow_html=True
-    )
-
-
-# Carregamento de dados simplificado
+# =========================================================
+# DADOS (GSHEETS)
+# =========================================================
 conn = st.connection("gsheets", type=GSheetsConnection)
 df = conn.read()
 df.columns = [str(c).strip() for c in df.columns]
 
-# Evita erro se a coluna tiver NaN
-nomes = df["Nome do Estudante"].dropna().unique().tolist()
+nomes = []
+if "Nome do Estudante" in df.columns:
+    nomes = df["Nome do Estudante"].dropna().unique().tolist()
 
-aluno_nome = st.selectbox(
-    "Selecione o Estudante:",
-    ["Selecione..."] + nomes,
-)
+# =========================================================
+# ABAS
+# =========================================================
+tab_pei, tab_ativ = st.tabs(["📄 PEI", "📚 ATIVIDADES"])
 
-if aluno_nome != "Selecione...":
-    aluno = df[df["Nome do Estudante"] == aluno_nome].iloc[0].to_dict()
 
-    # (01) DADOS PESSOAIS
-    with st.expander("👤 (01) Dados Pessoais", expanded=True):
-        col1, col2 = st.columns(2)
-        docente = col1.text_input("Docente:", placeholder="Nome do Professor")
-        disciplina = col2.text_input("Componente Curricular:", placeholder="Nome da Disciplina")
-
-        # Preenchimento automático da planilha (mantido)
-        obs = st.text_input("Obs.:", value=str(aluno.get("Obs.", "")))
-
-    # (02) HISTÓRICO
-    hist_txt = st.text_area(
-        "(02) Histórico (Origem até a atualidade):",
-        value=str(aluno.get("(02) Histórico", "")),
-        height=80,
+# =========================================================
+# ABA PEI
+# =========================================================
+with tab_pei:
+    aluno_nome = st.selectbox(
+        "Selecione o Estudante:",
+        ["Selecione..."] + nomes,
+        key="aluno_pei"
     )
 
-    # (03) e (04)
-    col_a, col_b = st.columns(2)
-    nec_val = col_a.text_area(
-        "(03) Necessidades Educacionais:",
-        value=str(aluno.get("(03) Necessidades Educacionais Específicas", "")),
-    )
-    hab_val = col_b.text_area(
-        "(04) Conhecimentos e Habilidades:",
-        value=str(aluno.get("(04) Conhecimentos e Habilidades", "")),
+    if aluno_nome != "Selecione...":
+        aluno = df[df["Nome do Estudante"] == aluno_nome].iloc[0].to_dict()
+
+        with st.expander("👤 (01) Dados Pessoais", expanded=True):
+            col1, col2 = st.columns(2)
+            docente = col1.text_input("Docente:", placeholder="Nome do Professor", key="docente_pei")
+            disciplina = col2.text_input("Componente Curricular:", placeholder="Nome da Disciplina", key="disciplina_pei")
+            obs = st.text_input("Obs.:", value=str(aluno.get("Obs.", "")), key="obs_pei")
+
+        hist_txt = st.text_area("(02) Histórico (Origem até a atualidade):",
+                                value=str(aluno.get("(02) Histórico", "")),
+                                height=80,
+                                key="hist_pei")
+
+        col_a, col_b = st.columns(2)
+        nec_val = col_a.text_area("(03) Necessidades Educacionais:",
+                                 value=str(aluno.get("(03) Necessidades Educacionais Específicas", "")),
+                                 key="nec_pei")
+        hab_val = col_b.text_area("(04) Conhecimentos e Habilidades:",
+                                 value=str(aluno.get("(04) Conhecimentos e Habilidades", "")),
+                                 key="hab_pei")
+
+        col_a, col_b = st.columns(2)
+        dif_val = col_a.text_area("(05) Dificuldades Apresentadas",
+                                  value=str(aluno.get("(05) Dificuldades Apresentadas", "")),
+                                  key="dif_pei")
+        ada_val = col_b.text_area("(06) Adaptações Razoáveis e/ou Acessibilidades",
+                                  value=str(aluno.get("(06) Adaptações Razoáveis e/ou Acessibilidades", "")),
+                                  key="ada_pei")
+
+        st.text_area("(08) Conteúdos Programáticos:", key="k_08_pei", height=80)
+
+        if st.button("🚀 Gerar Sugestões e Preencher (PEI)", key="btn_ia_pei"):
+            if not docente or not disciplina or not st.session_state.k_08_pei:
+                st.error("Preencha Docente, Componente Curricular e o Conteúdo (08) primeiro.")
+            else:
+                with st.spinner("IA processando e preenchendo os campos..."):
+                    prompt = f"""
+Você é um especialista em Educação Inclusiva e PEI no contexto do IFMT.
+Sua tarefa é gerar SOMENTE os campos (07), (09), (10) e (11) do PEI, de forma individualizada,
+levando em consideração TODO o contexto do estudante abaixo.
+
+REGRAS IMPORTANTES:
+1) Use EXATAMENTE este formato com numeração e títulos (para eu extrair por regex):
+07 - Objetivos Específicos:
+09 - Metodologia:
+10 - Avaliação:
+11 - Resultados Esperados:
+
+2) Não escreva nada fora desses quatro blocos. Não inclua 08, 02, comentários, introdução, nem explicações.
+3) Escreva em português, em tópicos curtos e objetivos (sem textão).
+4) Seja realista e aplicável em sala (IFMT). Priorize acessibilidade, UDL/DUA e adaptações razoáveis (sem inventar diagnóstico).
+5) Metodologia e avaliação devem estar coerentes com:
+   - necessidades, habilidades, dificuldades e adaptações informadas
+   - o conteúdo programático (08)
+   - o componente curricular (disciplina)
+6) Avaliação: descreva como avaliar com flexibilidade (instrumentos, tempo, forma, critérios), e como registrar evidências.
+7) Resultados esperados: mensuráveis e observáveis.
+
+DADOS DO CONTEXTO
+Aluno: {aluno_nome}
+Curso: {aluno.get("Curso","")}
+Idade: {aluno.get("Idade","")}
+Docente: {docente}
+Componente Curricular: {disciplina}
+
+(02) Histórico:
+{hist_txt}
+
+(03) Necessidades:
+{nec_val}
+
+(04) Habilidades:
+{hab_val}
+
+(05) Dificuldades:
+{dif_val}
+
+(06) Adaptações:
+{ada_val}
+
+Obs.:
+{obs}
+
+(08) Conteúdos Programáticos:
+{st.session_state.k_08_pei}
+
+AGORA GERE A SAÍDA NO FORMATO EXATO.
+"""
+                    raw_response = call_maritalk(prompt)
+                    st.session_state.ia_raw = raw_response
+                    parse_and_apply_ia(raw_response)
+                    st.rerun()
+
+        c_left, c_right = st.columns(2)
+        with c_left:
+            st.text_area("(07) Objetivos Específicos:", key="k_07", height=120)
+            st.text_area("(09) Metodologia:", key="k_09", height=120)
+        with c_right:
+            st.text_area("(10) Avaliação:", key="k_10", height=120)
+            st.text_area("(11) Resultados Esperados:", key="k_11", height=120)
+
+        if st.button("📥 Montar PDF Final (PEI)", key="btn_pdf_pei"):
+            pdf = PEI_PDF()
+            pdf.add_page()
+
+            pdf.section_header("(01) DADOS PESSOAIS")
+            pdf.info_box(f"Nome do Estudante: {aluno_nome}")
+            pdf.info_box(
+                "Nome do Responsável: "
+                f"{aluno.get('Nome do Pai/Mãe ou responsável', '')} | "
+                f"Tel: {aluno.get('Telefone para contato', '')}"
+            )
+            pdf.info_box(
+                "Data Nascimento: "
+                f"{aluno.get('Data do Nascimento', '')} | "
+                f"Idade: {aluno.get('Idade', '')}"
+            )
+            pdf.info_box(f"Curso: {aluno.get('Curso', '')}")
+            pdf.info_box(f"Componente Curricular: {disciplina} | Docente: {docente}")
+
+            pdf.section_header("(02) HISTÓRICO")
+            pdf.info_box(hist_txt)
+
+            pdf.section_header("(03) NECESSIDADES EDUCACIONAIS ESPECÍFICAS")
+            pdf.info_box(nec_val)
+
+            pdf.section_header("(04) CONHECIMENTOS E HABILIDADES")
+            pdf.info_box(hab_val)
+
+            pdf.section_header("(05) DIFICULDADES APRESENTADAS")
+            pdf.info_box(dif_val)
+
+            pdf.section_header("(06) ADAPTAÇÕES")
+            pdf.info_box(ada_val)
+
+            pdf.section_header("(07) OBJETIVOS ESPECÍFICOS")
+            pdf.info_box(st.session_state.k_07)
+
+            pdf.section_header("(08) CONTEÚDOS PROGRAMÁTICOS")
+            pdf.info_box(st.session_state.k_08_pei)
+
+            pdf.section_header("(09) METODOLOGIA")
+            pdf.info_box(st.session_state.k_09)
+
+            pdf.section_header("(10) AVALIAÇÃO")
+            pdf.info_box(st.session_state.k_10)
+
+            pdf.section_header("(11) RESULTADOS ESPERADOS")
+            pdf.info_box(st.session_state.k_11)
+
+            pdf.ln(10)
+            pdf.set_font("Arial", "B", 10)
+            pdf.cell(0, 5, safe_pdf_text("(14) ASSINATURAS"), ln=True)
+            pdf.ln(5)
+
+            pdf.set_font("Arial", "", 9)
+            pdf.cell(0, 6, safe_pdf_text("_________________________________________________          ____/____/________"), ln=True)
+            pdf.cell(0, 6, safe_pdf_text("Assinatura do Docente"), ln=True)
+            pdf.ln(4)
+
+            pdf.cell(0, 6, safe_pdf_text("_________________________________________________          ____/____/________"), ln=True)
+            pdf.cell(0, 6, safe_pdf_text("Assinatura da Coordenação de Curso"), ln=True)
+            pdf.ln(4)
+
+            pdf.cell(0, 6, safe_pdf_text("_________________________________________________          ____/____/________"), ln=True)
+            pdf.cell(0, 6, safe_pdf_text("Assinatura do Departamento de Ensino"), ln=True)
+
+            st.download_button(
+                "Clique aqui para baixar o PDF (PEI)",
+                data=pdf_bytes(pdf),
+                file_name=f"PEI_{aluno_nome}.pdf",
+                mime="application/pdf",
+                key="dl_pei",
+            )
+
+
+# =========================================================
+# ABA ATIVIDADES (EXTERNO AO PEI)
+# =========================================================
+with tab_ativ:
+    st.markdown("### 📚 Gerador de Atividades (externo ao PEI)")
+
+    aluno_nome_ativ = st.selectbox(
+        "Selecione o Estudante (opcional):",
+        ["(Sem estudante)"] + nomes,
+        key="aluno_ativ"
     )
 
-    # (05) e (06)
-    col_a, col_b = st.columns(2)
-    dif_val = col_a.text_area(
-        "(05) Dificuldades Apresentadas",
-        value=str(aluno.get("(05) Dificuldades Apresentadas", "")),
-    )
-    ada_val = col_b.text_area(
-        "(06) Adaptações Razoáveis e/ou Acessibilidades",
-        value=str(aluno.get("(06) Adaptações Razoáveis e/ou Acessibilidades", "")),
-    )
+    aluno_ativ = None
+    if aluno_nome_ativ != "(Sem estudante)":
+        aluno_ativ = df[df["Nome do Estudante"] == aluno_nome_ativ].iloc[0].to_dict()
 
-    
+    col1, col2 = st.columns(2)
+    docente_ativ = col1.text_input("Docente:", placeholder="Nome do Professor", key="docente_ativ")
+    disciplina_ativ = col2.text_input("Componente Curricular:", placeholder="Nome da Disciplina", key="disciplina_ativ")
 
-    # (08) CONTEÚDO
-    st.text_area("(08) Conteúdos Programáticos:", key="k_08", height=80)
+    st.text_area("(08) Conteúdos Programáticos (base):", key="k_08_ativ", height=110)
+    st.text_area("(12) Sugestões de Atividades (editável):", key="k_12_ativ", height=280)
 
-    # AÇÃO IA
-    if st.button("🚀 Gerar Sugestões e Preencher"):
-        if not disciplina or not st.session_state.k_08:
+    if st.button("🧠 Gerar Atividades", key="btn_ia_ativ"):
+        if not disciplina_ativ or not st.session_state.k_08_ativ:
             st.error("Preencha o Componente Curricular e o Conteúdo (08) primeiro.")
         else:
-            with st.spinner("IA processando e preenchendo os campos..."):
-                prompt = f"""
-                Você é um especialista em Educação Inclusiva e PEI no contexto do IFMT.
-                Sua tarefa é gerar SOMENTE os campos (07), (09), (10) e (11) do PEI, de forma individualizada,
-                levando em consideração TODO o contexto do estudante abaixo.
+            # Contexto opcional (se aluno selecionado)
+            hist = nec = hab = dif = ada = obs_local = ""
+            curso = idade = ""
+            if aluno_ativ:
+                curso = str(aluno_ativ.get("Curso", ""))
+                idade = str(aluno_ativ.get("Idade", ""))
+                hist = str(aluno_ativ.get("(02) Histórico", ""))
+                nec  = str(aluno_ativ.get("(03) Necessidades Educacionais Específicas", ""))
+                hab  = str(aluno_ativ.get("(04) Conhecimentos e Habilidades", ""))
+                dif  = str(aluno_ativ.get("(05) Dificuldades Apresentadas", ""))
+                ada  = str(aluno_ativ.get("(06) Adaptações Razoáveis e/ou Acessibilidades", ""))
+                obs_local = str(aluno_ativ.get("Obs.", ""))
 
-                REGRAS IMPORTANTES:
-                1) Use EXATAMENTE este formato com numeração e títulos (para eu extrair por regex):
-                07 - Objetivos Específicos:
-                09 - Metodologia:
-                10 - Avaliação:
-                11 - Resultados Esperados:
+            with st.spinner("IA gerando atividades..."):
+                prompt_ativ = f"""
+Você é especialista em planejamento didático inclusivo no IFMT.
+Gere SOMENTE o bloco abaixo.
 
-                 Não escreva nada fora desses quatro blocos. Não inclua 08, 02, comentários, introdução, nem explicações.
-                 Escreva em português, em tópicos curtos e objetivos (sem textão).
-                 Seja realista e aplicável em sala (IFMT). Priorize acessibilidade, UDL/DUA e adaptações razoáveis (sem inventar diagnóstico).
-                 Metodologia e avaliação devem estar coerentes com:
-                - necessidades, habilidades, dificuldades e adaptações informadas
-                - o conteúdo programático (08)
-                - o componente curricular (disciplina)
-                 Avaliação: descreva como avaliar com flexibilidade (instrumentos, tempo, forma, critérios), e como registrar evidências.
-                 Resultados esperados: mensuráveis e observáveis (ex.: “resolve X com apoio Y”, “produz Z com rubrica W”).
+FORMATO OBRIGATÓRIO:
+12 - Sugestões de Atividades:
 
-                DADOS DO CONTEXTO
-                Aluno: {aluno_nome}
-                Curso: {aluno.get("Curso","")}
-                Idade: {aluno.get("Idade","")}
-                Docente: {docente}
-                Componente Curricular: {disciplina}
+REGRAS:
+- Não escreva nada fora do bloco 12.
+- Liste de 6 a 10 atividades, prontas para aplicar.
+- Para cada atividade use:
+  • Atividade:
+  • Objetivo:
+  • Materiais:
+  • Como aplicar (passos):
+  • Adaptações/apoios:
+  • Evidência para avaliar:
 
-                (02) Histórico:
-                {hist_txt}
+CONTEXTO (se houver estudante, personalize; se não houver, mantenha genérico):
+Estudante: {aluno_nome_ativ}
+Curso: {curso}
+Idade: {idade}
+Histórico: {hist}
+Necessidades: {nec}
+Habilidades: {hab}
+Dificuldades: {dif}
+Adaptações: {ada}
+Obs.: {obs_local}
 
-                (03) Necessidades Educacionais Específicas:
-                {nec_val}
+Docente: {docente_ativ}
+Componente Curricular: {disciplina_ativ}
 
-                (04) Conhecimentos e Habilidades:
-                {hab_val}
+Conteúdos (08):
+{st.session_state.k_08_ativ}
 
-                (05) Dificuldades Apresentadas:
-                {dif_val}
-
-                (06) Adaptações Razoáveis e/ou Acessibilidades:
-                {ada_val}
-
-                Obs. (se houver):
-                {obs}
-
-                (08) Conteúdos Programáticos:
-                {st.session_state.k_08}
-
-                AGORA GERE A SAÍDA NO FORMATO EXATO.
-                """
-                raw_response = call_maritalk(prompt)
-                st.session_state.ia_raw = raw_response
-                parse_and_apply_ia(raw_response)
+AGORA GERE A SAÍDA NO FORMATO EXATO.
+"""
+                raw = call_maritalk(prompt_ativ)
+                st.session_state["ia_ativ_raw"] = raw
+                parse_and_apply_activities(raw)
                 st.rerun()
 
-    # Campos Editáveis (07, 09, 10, 11)
-    c_left, c_right = st.columns(2)
-    with c_left:
-        st.text_area("(07) Objetivos Específicos:", key="k_07", height=120)
-        st.text_area("(09) Metodologia:", key="k_09", height=120)
-    with c_right:
-        st.text_area("(10) Avaliação:", key="k_10", height=120)
-        st.text_area("(11) Resultados Esperados:", key="k_11", height=120)
-
-    # GERAR PDF
-    if st.button("📥 Montar PDF Final"):
-        pdf = PEI_PDF()
+    if st.button("📥 Montar PDF (Atividades)", key="btn_pdf_ativ"):
+        pdf = ATIV_PDF()
         pdf.add_page()
 
-        # (01) DADOS
-        pdf.section_header("(01) DADOS PESSOAIS")
-        pdf.info_box(f"Nome do Estudante: {aluno_nome}")
-        pdf.info_box(
-            "Nome do Responsável: "
-            f"{aluno.get('Nome do Pai/Mãe ou responsável', '')} | "
-            f"Tel: {aluno.get('Telefone para contato', '')}"
-        )
-        pdf.info_box(
-            "Data Nascimento: "
-            f"{aluno.get('Data do Nascimento', '')} | "
-            f"Idade: {aluno.get('Idade', '')}"
-        )
-        pdf.info_box(f"Curso: {aluno.get('Curso', '')}")
-        pdf.info_box(f"Componente Curricular: {disciplina} | Docente: {docente}")
-
-        # Seções
-        pdf.section_header("(02) HISTÓRICO")
-        pdf.info_box(hist_txt)
-
-        pdf.section_header("(03) NECESSIDADES EDUCACIONAIS ESPECÍFICAS")
-        pdf.info_box(nec_val)
-
-        pdf.section_header("(04) CONHECIMENTOS E HABILIDADES")
-        pdf.info_box(hab_val)
-
-        pdf.section_header("(05) DIFICULDADES APRESENTADAS")
-        pdf.info_box(dif_val)
-
-        pdf.section_header("(06) ADAPTAÇÕES")
-        pdf.info_box(ada_val)
-
-        pdf.section_header("(07) OBJETIVOS ESPECÍFICOS")
-        pdf.info_box(st.session_state.k_07)
-
-        pdf.section_header("(08) CONTEÚDOS PROGRAMÁTICOS")
-        pdf.info_box(st.session_state.k_08)
-
-        pdf.section_header("(09) METODOLOGIA")
-        pdf.info_box(st.session_state.k_09)
-
-        pdf.section_header("(10) AVALIAÇÃO")
-        pdf.info_box(st.session_state.k_10)
-
-        pdf.section_header("(11) RESULTADOS ESPERADOS")
-        pdf.info_box(st.session_state.k_11)
-
-        # ASSINATURAS
-        pdf.ln(10)
-        pdf.set_font("Arial", "B", 10)
-        pdf.cell(0, 5, safe_pdf_text("(14) ASSINATURAS"), ln=True)
-        pdf.ln(5)
-
-        pdf.set_font("Arial", "", 9)
-        pdf.cell(0, 6, safe_pdf_text("_________________________________________________          ____/____/________"), ln=True)
-        pdf.cell(0, 6, safe_pdf_text("Assinatura do Docente"), ln=True)
-        pdf.ln(4)
-
-        pdf.cell(0, 6, safe_pdf_text("_________________________________________________          ____/____/________"), ln=True)
-        pdf.cell(0, 6, safe_pdf_text("Assinatura da Coordenação de Curso"), ln=True)
-        pdf.ln(4)
-
-        pdf.cell(0, 6, safe_pdf_text("_________________________________________________          ____/____/________"), ln=True)
-        pdf.cell(0, 6, safe_pdf_text("Assinatura do Departamento de Ensino"), ln=True)
-
-        # DOWNLOAD (sem arquivo em disco)
-        # fpdf2: output(dest="S") -> str; fpdf antigo: pode ser bytes/str dependendo da versão
-        pdf_out = pdf.output(dest="S")
-        if isinstance(pdf_out, str):
-            pdf_bytes = pdf_out.encode("latin-1", errors="replace")
+        pdf.section_header("IDENTIFICAÇÃO")
+        if aluno_nome_ativ == "(Sem estudante)":
+            pdf.info_box("Estudante: (não selecionado)")
+            pdf.info_box("Curso: ")
+            pdf.info_box("Idade: ")
         else:
-            pdf_bytes = bytes(pdf_out)
+            pdf.info_box(f"Estudante: {aluno_nome_ativ}")
+            pdf.info_box(f"Curso: {aluno_ativ.get('Curso','') if aluno_ativ else ''}")
+            pdf.info_box(f"Idade: {aluno_ativ.get('Idade','') if aluno_ativ else ''}")
+
+        pdf.info_box(f"Componente Curricular: {disciplina_ativ} | Docente: {docente_ativ}")
+
+        pdf.section_header("CONTEÚDOS INFORMADOS (base para as atividades)")
+        pdf.info_box(st.session_state.k_08_ativ)
+
+        pdf.section_header("ATIVIDADES SUGERIDAS (editáveis)")
+        pdf.info_box(st.session_state.k_12_ativ)
 
         st.download_button(
-            "Clique aqui para baixar o PDF",
-            data=pdf_bytes,
-            file_name=f"PEI_{aluno_nome}.pdf",
+            "Clique aqui para baixar o PDF (Atividades)",
+            data=pdf_bytes(pdf),
+            file_name="Atividades.pdf",
             mime="application/pdf",
+            key="dl_ativ",
         )
 
