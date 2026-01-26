@@ -149,11 +149,11 @@ with col_centro:
     
     # Centralização manual da imagem via CSS
     st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-    st.image("ifmt_barra.png", width=40) # Aumentei um pouco para facilitar o ajuste
+    st.image("ifmt_barra.png", width=70) # Aumentei um pouco para facilitar o ajuste
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown(
-        "<h3 style='text-align: center; margin-top: 0px;'>Gerador de PEI - IFMT</h3>",
+        "<h3 style='text-align: center; margin-top: -50px;'>Gerador de PEI - IFMT</h3>",
         unsafe_allow_html=True
     )
 
