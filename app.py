@@ -140,25 +140,26 @@ class PEI_PDF(FPDF):
 # INTERFACE STREAMLIT
 # =========================================================
 import streamlit as st
-import base64
 
-# Função para converter imagem local em base64 (necessário para HTML no Streamlit)
-def get_image_base64(path):
-    with open(path, "rb") as img_file:
-        return base64.b64encode(img_file.read()).decode()
-
-col_esq, col_centro, col_dir = st.columns([1, 4, 1])
+# Criamos 3 colunas. Aumentar o peso das laterais ajuda a centralizar melhor o miolo.
+col_esq, col_centro, col_dir = st.columns([2, 2, 2])
 
 with col_centro:
-    # Se a imagem for local, use o base64. Se for URL, use o link direto no src.
-    # img_b64 = get_image_base64("ifmt_barra.png") 
-    
+    # 1. Centralização da imagem usando st.image
+    # O truque é colocar a imagem e o texto dentro do mesmo container
+    st.image("ifmt_barra.png", width=60) 
+
+    # 2. Texto com margem negativa para aproximar da imagem
     st.markdown(
-        f"""
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
-            <img src="https://via.placeholder.com/30" width="30">
-            <h3 style="margin-top: 10px; text-align: center;">Gerador de PEI - IFMT</h3>
-        </div>
+        """
+        <style>
+            .titulo-central {
+                text-align: center;
+                margin-top: -20px; /* Puxa o texto para cima, mais perto da logo */
+                font-family: sans-serif;
+            }
+        </style>
+        <h3 class='titulo-central'>Gerador de PEI - IFMT</h3>
         """,
         unsafe_allow_html=True
     )
