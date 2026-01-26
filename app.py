@@ -139,8 +139,15 @@ class PEI_PDF(FPDF):
 # =========================================================
 # INTERFACE STREAMLIT
 # =========================================================
-st.title("🌿 Gerador de PEI Oficial - IFMT")
-
+st.markdown(
+    """
+    <div style="text-align:center">
+        <img src="images (1).png" width="180">
+        <h2>Gerador de PEI Oficial - IFMT</h2>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 # Carregamento de dados simplificado
 conn = st.connection("gsheets", type=GSheetsConnection)
 df = conn.read()
