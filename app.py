@@ -139,7 +139,7 @@ class PEI_PDF(FPDF):
 # =========================================================
 # INTERFACE STREAMLIT
 # =========================================================
-st.image("logo_ifmt.png", width=130)
+st.image("logo_ifmt.png", width=180)
 st.title("Gerador de PEI - IFMT")
 
 
