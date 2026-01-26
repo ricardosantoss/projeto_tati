@@ -139,15 +139,27 @@ class PEI_PDF(FPDF):
 # =========================================================
 # INTERFACE STREAMLIT
 # =========================================================
-col_esq, col_centro, col_dir = st.columns([2, 3, 2])
+import streamlit as st
+import base64
+
+# Função para converter imagem local em base64 (necessário para HTML no Streamlit)
+def get_image_base64(path):
+    with open(path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+
+col_esq, col_centro, col_dir = st.columns([1, 4, 1])
 
 with col_centro:
-    img_esq, img_mid, img_dir = st.columns([1, 2, 1])
-    with img_mid:
-        st.image("ifmt_barra.png", width=30)
-
+    # Se a imagem for local, use o base64. Se for URL, use o link direto no src.
+    # img_b64 = get_image_base64("ifmt_barra.png") 
+    
     st.markdown(
-        "<h3 style='text-align:center; margin-top: 8px;'>Gerador de PEI - IFMT</h3>",
+        f"""
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <img src="https://via.placeholder.com/30" width="30">
+            <h3 style="margin-top: 10px; text-align: center;">Gerador de PEI - IFMT</h3>
+        </div>
+        """,
         unsafe_allow_html=True
     )
 
