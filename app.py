@@ -156,10 +156,13 @@ st.markdown("""
 # 2. Criamos 3 colunas (a proporção 1, 2, 1 foca bem o conteúdo no meio)
 col_esq, col_centro, col_dir = st.columns([1, 2, 1])
 
-with col_centro:
+with col_esq:
     # Usamos st.image para carregar o arquivo local (evita o erro da imagem quebrada)
     st.image("ifmt_barra.png", width=100) 
-    
+
+
+with col_centro:
+
     # Texto centralizado com margem ajustada
     st.markdown(
         "<h3 style='text-align: center; margin-top: 5px;'>Gerador de PEI - IFMT</h3>", 
