@@ -139,7 +139,6 @@ class PEI_PDF(FPDF):
 # =========================================================
 # INTERFACE STREAMLIT
 # =========================================================
-import streamlit as st
 
 # 1. Injeção de CSS para centralizar o widget de imagem globalmente
 st.markdown("""
@@ -163,7 +162,7 @@ col_esq, col_centro, col_dir = st.columns([1, 2, 1])
 
 with col_centro:
     # A imagem agora será centralizada pelo CSS acima
-    st.image("ifmt_barra.png", width=70)
+    st.image("ifmt_barra.png", width=90)
     
     # O título com a classe que definimos no CSS
     st.markdown("<h3 class='titulo-header'>Gerador de PEI - IFMT</h3>", unsafe_allow_html=True)
