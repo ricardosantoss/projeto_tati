@@ -139,8 +139,14 @@ class PEI_PDF(FPDF):
 # =========================================================
 # INTERFACE STREAMLIT
 # =========================================================
-st.image("ifmt_barra.png", width=130)
-st.title("Gerador de PEI - IFMT")
+col_esq, col_centro, col_dir = st.columns([1, 2, 1])
+
+with col_centro:
+    st.image("ifmt_barra.png", width=90)
+    st.markdown(
+        "<h3 style='text-align: center;'>Gerador de PEI - IFMT</h3>",
+        unsafe_allow_html=True
+    )
 
 
 # Carregamento de dados simplificado
