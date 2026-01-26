@@ -140,32 +140,31 @@ class PEI_PDF(FPDF):
 # INTERFACE STREAMLIT
 # =========================================================
 
-# 1. Injeção de CSS para centralizar o widget de imagem globalmente
+import streamlit as st
+
+# 1. CSS para forçar a centralização do componente de imagem do Streamlit
 st.markdown("""
     <style>
-    /* Alinha o container da imagem ao centro */
+    /* Alinha o container da imagem no centro da coluna */
     [data-testid="stImage"] {
         display: flex;
         justify-content: center;
     }
-    /* Remove o excesso de espaço abaixo da imagem e ajusta o título */
-    .titulo-header {
-        text-align: center;
-        margin-top: -15px !important; /* Ajuste aqui para colar mais ou menos na imagem */
-        font-weight: bold;
-    }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. Estrutura de colunas (o 1, 2, 1 ajuda a dar foco ao centro)
+# 2. Criamos 3 colunas (a proporção 1, 2, 1 foca bem o conteúdo no meio)
 col_esq, col_centro, col_dir = st.columns([1, 2, 1])
 
 with col_centro:
-    # A imagem agora será centralizada pelo CSS acima
-    st.image("ifmt_barra.png", width=90)
+    # Usamos st.image para carregar o arquivo local (evita o erro da imagem quebrada)
+    st.image("ifmt_barra.png", width=100) 
     
-    # O título com a classe que definimos no CSS
-    st.markdown("<h3 class='titulo-header'>Gerador de PEI - IFMT</h3>", unsafe_allow_html=True)
+    # Texto centralizado com margem ajustada
+    st.markdown(
+        "<h3 style='text-align: center; margin-top: 5px;'>Gerador de PEI - IFMT</h3>", 
+        unsafe_allow_html=True
+    )
 
 
 # Carregamento de dados simplificado
