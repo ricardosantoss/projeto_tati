@@ -142,13 +142,9 @@ class PEI_PDF(FPDF):
 col_esq, col_centro, col_dir = st.columns([2, 3, 2])
 
 with col_centro:
+    st.image("ifmt_barra.png", width=80)
     st.markdown(
-        """
-        <div style="text-align: center;">
-            <img src="ifmt_barra.png" width="80">
-            <h3 style="margin-top: 10px;">Gerador de PEI - IFMT</h3>
-        </div>
-        """,
+        "<h3 style='text-align: center;'>Gerador de PEI - IFMT</h3>",
         unsafe_allow_html=True
     )
 
