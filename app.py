@@ -144,7 +144,7 @@ col_esq, col_centro, col_dir = st.columns([2, 3, 2])
 with col_centro:
     img_esq, img_mid, img_dir = st.columns([1, 2, 1])
     with img_mid:
-        st.image("ifmt_barra.png", width=70)
+        st.image("ifmt_barra.png", width=30)
 
     st.markdown(
         "<h3 style='text-align:center; margin-top: 8px;'>Gerador de PEI - IFMT</h3>",
