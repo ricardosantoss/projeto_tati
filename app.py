@@ -215,11 +215,11 @@ if aluno_nome != "Selecione...":
 
     # (05) e (06)
     col_a, col_b = st.columns(2)
-    nec_val = col_a.text_area(
+    dif_val = col_a.text_area(
         "(05) Dificuldades Apresentadas",
         value=str(aluno.get("(05) Dificuldades Apresentadas", "")),
     )
-    hab_val = col_b.text_area(
+    ada_val = col_b.text_area(
         "(06) Adaptações Razoáveis e/ou Acessibilidades",
         value=str(aluno.get("(06) Adaptações Razoáveis e/ou Acessibilidades", "")),
     )
@@ -235,11 +235,58 @@ if aluno_nome != "Selecione...":
             st.error("Preencha o Componente Curricular e o Conteúdo (08) primeiro.")
         else:
             with st.spinner("IA processando e preenchendo os campos..."):
-                prompt = (
-                    f"Gere os campos (07) Objetivos, (09) Metodologia, (10) Avaliação e (11) Resultados "
-                    f"para o aluno {aluno_nome} na matéria {disciplina}. "
-                    f"Baseie-se no conteúdo: {st.session_state.k_08}."
-                )
+                prompt = (prompt = f"""
+                Você é um especialista em Educação Inclusiva e PEI no contexto do IFMT.
+                Sua tarefa é gerar SOMENTE os campos (07), (09), (10) e (11) do PEI, de forma individualizada,
+                levando em consideração TODO o contexto do estudante abaixo.
+
+                REGRAS IMPORTANTES:
+                1) Use EXATAMENTE este formato com numeração e títulos (para eu extrair por regex):
+                07 - Objetivos Específicos:
+                09 - Metodologia:
+                10 - Avaliação:
+                11 - Resultados Esperados:
+
+                 Não escreva nada fora desses quatro blocos. Não inclua 08, 02, comentários, introdução, nem explicações.
+                 Escreva em português, em tópicos curtos e objetivos (sem textão).
+                 Seja realista e aplicável em sala (IFMT). Priorize acessibilidade, UDL/DUA e adaptações razoáveis (sem inventar diagnóstico).
+                 Metodologia e avaliação devem estar coerentes com:
+                - necessidades, habilidades, dificuldades e adaptações informadas
+                - o conteúdo programático (08)
+                - o componente curricular (disciplina)
+                 Avaliação: descreva como avaliar com flexibilidade (instrumentos, tempo, forma, critérios), e como registrar evidências.
+                 Resultados esperados: mensuráveis e observáveis (ex.: “resolve X com apoio Y”, “produz Z com rubrica W”).
+
+                DADOS DO CONTEXTO
+                Aluno: {aluno_nome}
+                Curso: {aluno.get("Curso","")}
+                Idade: {aluno.get("Idade","")}
+                Docente: {docente}
+                Componente Curricular: {disciplina}
+
+                (02) Histórico:
+                {hist_txt}
+
+                (03) Necessidades Educacionais Específicas:
+                {nec_val}
+
+                (04) Conhecimentos e Habilidades:
+                {hab_val}
+
+                (05) Dificuldades Apresentadas:
+                {dif_val}
+
+                (06) Adaptações Razoáveis e/ou Acessibilidades:
+                {ada_val}
+
+                Obs. (se houver):
+                {obs}
+
+                (08) Conteúdos Programáticos:
+                {st.session_state.k_08}
+
+                AGORA GERE A SAÍDA NO FORMATO EXATO.
+                """
                 raw_response = call_maritalk(prompt)
                 st.session_state.ia_raw = raw_response
                 parse_and_apply_ia(raw_response)
@@ -284,6 +331,12 @@ if aluno_nome != "Selecione...":
 
         pdf.section_header("(04) CONHECIMENTOS E HABILIDADES")
         pdf.info_box(hab_val)
+
+        pdf.section_header("(05) DIFICULDADES APRESENTADAS")
+        pdf.info_box(dif_val)
+
+        pdf.section_header("(06) ADAPTAÇÕES")
+        pdf.info_box(ada_val)
 
         pdf.section_header("(07) OBJETIVOS ESPECÍFICOS")
         pdf.info_box(st.session_state.k_07)
