@@ -139,15 +139,18 @@ class PEI_PDF(FPDF):
 # =========================================================
 # INTERFACE STREAMLIT
 # =========================================================
-col_esq, col_centro, col_dir = st.columns([1, 2, 1])
+col_esq, col_centro, col_dir = st.columns([2, 3, 2])
 
 with col_centro:
-    st.image("ifmt_barra.png", width=90)
     st.markdown(
-        "<h3 style='text-align: center;'>Gerador de PEI - IFMT</h3>",
+        """
+        <div style="text-align: center;">
+            <img src="ifmt_barra.png" width="80">
+            <h3 style="margin-top: 10px;">Gerador de PEI - IFMT</h3>
+        </div>
+        """,
         unsafe_allow_html=True
     )
-
 
 # Carregamento de dados simplificado
 conn = st.connection("gsheets", type=GSheetsConnection)
