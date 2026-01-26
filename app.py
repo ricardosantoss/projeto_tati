@@ -213,6 +213,19 @@ if aluno_nome != "Selecione...":
         value=str(aluno.get("(04) Conhecimentos e Habilidades", "")),
     )
 
+    # (05) e (06)
+    col_a, col_b = st.columns(2)
+    nec_val = col_a.text_area(
+        "(05) Dificuldades Apresentadas",
+        value=str(aluno.get("(05) Dificuldades Apresentadas", "")),
+    )
+    hab_val = col_b.text_area(
+        "(06) Adaptações Razoáveis e/ou Acessibilidades",
+        value=str(aluno.get("(06) Adaptações Razoáveis e/ou Acessibilidades", "")),
+    )
+
+    
+
     # (08) CONTEÚDO
     st.text_area("(08) Conteúdos Programáticos:", key="k_08", height=80)
 
