@@ -235,7 +235,7 @@ if aluno_nome != "Selecione...":
             st.error("Preencha o Componente Curricular e o Conteúdo (08) primeiro.")
         else:
             with st.spinner("IA processando e preenchendo os campos..."):
-                prompt = (prompt = f"""
+                prompt = f"""
                 Você é um especialista em Educação Inclusiva e PEI no contexto do IFMT.
                 Sua tarefa é gerar SOMENTE os campos (07), (09), (10) e (11) do PEI, de forma individualizada,
                 levando em consideração TODO o contexto do estudante abaixo.
