@@ -20,11 +20,13 @@ def init_session_keys():
     keys = [
         # PEI
         "k_07", "k_08_pei", "k_09", "k_10", "k_11", "ia_raw",
-        # ATIVIDADES
-        "k_08_ativ", "k_12_ativ", "ia_ativ_raw",
+        # ATIVIDADES (widget + buffer para evitar conflito de session_state)
+        "k_08_ativ", "k_12_ativ", "k_12_ativ_buf", "ia_ativ_raw",
         # UI
         "aluno_pei", "aluno_ativ", "docente_pei", "disciplina_pei",
         "docente_ativ", "disciplina_ativ",
+        # extras UI
+        "obs_pei", "hist_pei", "nec_pei", "hab_pei", "dif_pei", "ada_pei",
     ]
     for k in keys:
         if k not in st.session_state:
@@ -102,11 +104,14 @@ def parse_and_apply_ia(text: str):
 
 
 def parse_and_apply_activities(text: str):
-    """Extrai o bloco 12 e injeta no session_state (ATIVIDADES)."""
+    """Extrai o bloco 12 e escreve no BUFFER (evita conflito com widget key='k_12_ativ')."""
     p = r"(?is)(?:\(?12\)?|12\s*[-:])\s*(.*?)(?=$)"
     m = re.search(p, text, re.DOTALL)
     if m:
-        st.session_state["k_12_ativ"] = m.group(1).strip()
+        st.session_state["k_12_ativ_buf"] = m.group(1).strip()
+    else:
+        # fallback: não perde a resposta
+        st.session_state["k_12_ativ_buf"] = (text or "").strip()
 
 
 # =========================================================
@@ -216,26 +221,36 @@ with tab_pei:
             disciplina = col2.text_input("Componente Curricular:", placeholder="Nome da Disciplina", key="disciplina_pei")
             obs = st.text_input("Obs.:", value=str(aluno.get("Obs.", "")), key="obs_pei")
 
-        hist_txt = st.text_area("(02) Histórico (Origem até a atualidade):",
-                                value=str(aluno.get("(02) Histórico", "")),
-                                height=80,
-                                key="hist_pei")
+        hist_txt = st.text_area(
+            "(02) Histórico (Origem até a atualidade):",
+            value=str(aluno.get("(02) Histórico", "")),
+            height=80,
+            key="hist_pei",
+        )
 
         col_a, col_b = st.columns(2)
-        nec_val = col_a.text_area("(03) Necessidades Educacionais:",
-                                 value=str(aluno.get("(03) Necessidades Educacionais Específicas", "")),
-                                 key="nec_pei")
-        hab_val = col_b.text_area("(04) Conhecimentos e Habilidades:",
-                                 value=str(aluno.get("(04) Conhecimentos e Habilidades", "")),
-                                 key="hab_pei")
+        nec_val = col_a.text_area(
+            "(03) Necessidades Educacionais:",
+            value=str(aluno.get("(03) Necessidades Educacionais Específicas", "")),
+            key="nec_pei",
+        )
+        hab_val = col_b.text_area(
+            "(04) Conhecimentos e Habilidades:",
+            value=str(aluno.get("(04) Conhecimentos e Habilidades", "")),
+            key="hab_pei",
+        )
 
         col_a, col_b = st.columns(2)
-        dif_val = col_a.text_area("(05) Dificuldades Apresentadas",
-                                  value=str(aluno.get("(05) Dificuldades Apresentadas", "")),
-                                  key="dif_pei")
-        ada_val = col_b.text_area("(06) Adaptações Razoáveis e/ou Acessibilidades",
-                                  value=str(aluno.get("(06) Adaptações Razoáveis e/ou Acessibilidades", "")),
-                                  key="ada_pei")
+        dif_val = col_a.text_area(
+            "(05) Dificuldades Apresentadas",
+            value=str(aluno.get("(05) Dificuldades Apresentadas", "")),
+            key="dif_pei",
+        )
+        ada_val = col_b.text_area(
+            "(06) Adaptações Razoáveis e/ou Acessibilidades",
+            value=str(aluno.get("(06) Adaptações Razoáveis e/ou Acessibilidades", "")),
+            key="ada_pei",
+        )
 
         st.text_area("(08) Conteúdos Programáticos:", key="k_08_pei", height=80)
 
@@ -405,13 +420,18 @@ with tab_ativ:
     disciplina_ativ = col2.text_input("Componente Curricular:", placeholder="Nome da Disciplina", key="disciplina_ativ")
 
     st.text_area("(08) Conteúdos Programáticos (base):", key="k_08_ativ", height=110)
+
+    # ---- Sincronização BUFFER -> WIDGET (antes do widget nascer) ----
+    if st.session_state.get("k_12_ativ_buf"):
+        st.session_state["k_12_ativ"] = st.session_state["k_12_ativ_buf"]
+        st.session_state["k_12_ativ_buf"] = ""  # limpa para não sobrescrever edições futuras
+
     st.text_area("(12) Sugestões de Atividades (editável):", key="k_12_ativ", height=280)
 
     if st.button("🧠 Gerar Atividades", key="btn_ia_ativ"):
         if not disciplina_ativ or not st.session_state.k_08_ativ:
             st.error("Preencha o Componente Curricular e o Conteúdo (08) primeiro.")
         else:
-            # Contexto opcional (se aluno selecionado)
             hist = nec = hab = dif = ada = obs_local = ""
             curso = idade = ""
             if aluno_ativ:
@@ -496,4 +516,3 @@ AGORA GERE A SAÍDA NO FORMATO EXATO.
             mime="application/pdf",
             key="dl_ativ",
         )
-
