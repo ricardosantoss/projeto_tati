@@ -139,13 +139,23 @@ class PEI_PDF(FPDF):
 # =========================================================
 # INTERFACE STREAMLIT
 # =========================================================
+# Criamos 3 colunas, a central é onde tudo acontece
+col_esq, col_centro, col_dir = st.columns([2, 3, 2])
+
 with col_centro:
-    # Cria um alinhamento visual forçado
-    inner_col_1, inner_col_2, inner_col_3 = st.columns([1, 2, 1])
-    with inner_col_2:
-        st.image("ifmt_barra.png", width=50)
+    # Usamos o parâmetro use_container_width=False e centralizamos via Markdown
+    # O truque aqui é usar o st.columns apenas se quiser imagem AO LADO do texto.
+    # Se for ACIMA, não use colunas internas.
     
-    st.markdown("<h3 style='text-align: center; margin-top: -10px;'>Gerador de PEI - IFMT</h3>", unsafe_allow_html=True)
+    # Centralização manual da imagem via CSS
+    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+    st.image("ifmt_barra.png", width=40) # Aumentei um pouco para facilitar o ajuste
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown(
+        "<h3 style='text-align: center; margin-top: 0px;'>Gerador de PEI - IFMT</h3>",
+        unsafe_allow_html=True
+    )
 
 
 # Carregamento de dados simplificado
