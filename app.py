@@ -132,7 +132,7 @@ class BasePDF(FPDF):
         # Parâmetros: caminho, x (centralizado), y, largura
         # O valor 85 para o X centraliza uma imagem de 40mm em uma folha A4
         try:
-            self.image("Brasao_versaooficial.jpg", x=85, y=8, w=20)
+            self.image("Brasao_versaooficial.jpg", x=90, y=8, w=20)
         except Exception:
             # Caso a imagem não seja encontrada, o PDF continua sem erro
             pass
