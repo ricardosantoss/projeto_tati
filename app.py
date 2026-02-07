@@ -223,6 +223,15 @@ with tab_pei:
             disciplina = col2.text_input("Componente Curricular:", placeholder="Nome da Disciplina", key="disciplina_pei")
             obs = st.text_input("Obs.:", value=str(aluno.get("Obs.", "")), key="obs_pei")
 
+
+        diag_txt = st.text_area(
+            "Diagnóstico",
+            value=str(aluno.get("Diagnóstico", "")),
+            height=80,
+            key="diag_pei",
+        )
+
+        
         hist_txt = st.text_area(
             "(02) Histórico (Origem até a atualidade):",
             value=str(aluno.get("(02) Histórico", "")),
@@ -349,6 +358,9 @@ AGORA GERE A SAÍDA NO FORMATO EXATO.
 
 
             pdf.info_box(f"Componente Curricular: {disciplina} | Docente: {docente}")
+
+            pdf.section_header("DIAGNÓSTICO")
+            pdf.info_box(diag_txt)
 
             pdf.section_header("(02) HISTÓRICO")
             pdf.info_box(hist_txt)
