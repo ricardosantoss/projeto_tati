@@ -137,7 +137,7 @@ class BasePDF(FPDF):
             # Caso a imagem não seja encontrada, o PDF continua sem erro
             pass
             
-        self.ln(25) # Pula espaço para não escrever em cima da imagem
+        self.ln(5) # Pula espaço para não escrever em cima da imagem
         self.set_font("Arial", "B", 10)
         self.cell(0, 5, safe_pdf_text("Ministério da Educação"), ln=True, align="C")
         self.cell(0, 5, safe_pdf_text("Secretaria de Educação Profissional e Tecnológica"), ln=True, align="C")
