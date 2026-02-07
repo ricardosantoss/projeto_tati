@@ -196,6 +196,8 @@ nomes = []
 if "Nome do Estudante" in df.columns:
     nomes = df["Nome do Estudante"].dropna().unique().tolist()
 
+st.write("Colunas encontradas:", df.columns.tolist())
+
 # =========================================================
 # ABAS
 # =========================================================
@@ -341,7 +343,8 @@ AGORA GERE A SAÍDA NO FORMATO EXATO.
                 f"Idade: {aluno.get('Idade', '')}"
             )
             pdf.info_box(f"Curso: {aluno.get('Curso', '')}")
-            pdf.info_box(f"Ano/Turma: {aluno.get('Ano','')}")
+            ano_valor = aluno.get('Ano') or aluno.get('Ano/Turma') or ''
+            pdf.info_box(f"Ano/Turma: {ano_valor}")
 
 
 
