@@ -341,6 +341,7 @@ AGORA GERE A SAÍDA NO FORMATO EXATO.
                 f"Idade: {aluno.get('Idade', '')}"
             )
             pdf.info_box(f"Curso: {aluno.get('Curso', '')}")
+            pdf.info_box(f"Ano/Turma: {aluno.get('Ano/Turma', '')}")
             pdf.info_box(f"Componente Curricular: {disciplina} | Docente: {docente}")
 
             pdf.section_header("(02) HISTÓRICO")
