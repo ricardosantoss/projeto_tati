@@ -6,6 +6,8 @@ import pandas as pd
 import streamlit as st
 from fpdf import FPDF
 from streamlit_gsheets import GSheetsConnection
+from datetime import datetime
+
 
 # =========================================================
 # CONFIG
@@ -354,8 +356,10 @@ AGORA GERE A SAÍDA NO FORMATO EXATO.
             pdf.info_box(f"Curso: {aluno.get('Curso', '')}")
             ano_valor = aluno.get('Ano') or aluno.get('Ano/Turma') or ''
             pdf.info_box(f"Ano/Turma: {ano_valor}")
+            data_hoje = datetime.now().strftime("%d/%m/%Y")
+            pdf.info_box(f"Data de Preenchimento: {data_hoje}") 
 
-
+        
 
             pdf.info_box(f"Componente Curricular: {disciplina} | Docente: {docente}")
 
