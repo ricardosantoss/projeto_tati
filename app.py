@@ -128,6 +128,16 @@ class BasePDF(FPDF):
         self.set_auto_page_break(auto=True, margin=12)
 
     def header_brand(self):
+        # Insere o brasão centralizado
+        # Parâmetros: caminho, x (centralizado), y, largura
+        # O valor 85 para o X centraliza uma imagem de 40mm em uma folha A4
+        try:
+            self.image("Brasao_versaooficial.jpg", x=85, y=8, w=40)
+        except Exception:
+            # Caso a imagem não seja encontrada, o PDF continua sem erro
+            pass
+            
+        self.ln(25) # Pula espaço para não escrever em cima da imagem
         self.set_font("Arial", "B", 10)
         self.cell(0, 5, safe_pdf_text("Ministério da Educação"), ln=True, align="C")
         self.cell(0, 5, safe_pdf_text("Secretaria de Educação Profissional e Tecnológica"), ln=True, align="C")
