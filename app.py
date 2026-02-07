@@ -341,7 +341,7 @@ AGORA GERE A SAÍDA NO FORMATO EXATO.
                 f"Idade: {aluno.get('Idade', '')}"
             )
             pdf.info_box(f"Curso: {aluno.get('Curso', '')}")
-            ano_turma = str(aluno.get("Ano/Turma", "") or "").strip()
+            ano_turma = "" if pd.isna(ano_turma) else str(ano_turma).strip()
             pdf.info_box(f"Ano/Turma: {ano_turma}")
 
             pdf.info_box(f"Componente Curricular: {disciplina} | Docente: {docente}")
