@@ -203,7 +203,7 @@ with col_centro:
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 df = conn.read(
-    worksheet="Página1",
+    worksheet=0,
     ttl=0
 )
 
