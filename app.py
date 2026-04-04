@@ -246,22 +246,33 @@ with tab_pei:
     if aluno_nome != "Selecione...":
         aluno = df[df["Nome do Estudante"] == aluno_nome].iloc[0].to_dict()
 
-    with st.expander("👤 (01) Dados do Professor", expanded=True):
-    col1, col2 = st.columns(2)
-    docente = col1.text_input("Docente:", placeholder="Nome do Professor", key="docente_pei")
-    disciplina = col2.text_input("Componente Curricular:", placeholder="Nome da Disciplina", key="disciplina_pei")
-    obs = st.text_input(
-        "Observação (Se houve alguma informação relevante não contemplada em outros itens):",
-        value=str(aluno.get("Obs.", "")),
-        key="obs_pei"
-    )
+        with st.expander("👤 (01) Dados do Professor", expanded=True):
+            col1, col2 = st.columns(2)
 
-    conteudo_programatico = st.text_area(
-        "(08) Conteúdos Programáticos:",
-        value=st.session_state.get("k_08_pei", ""),
-        key="k_08_pei",
-        height=80
-    )
+            docente = col1.text_input(
+                "Docente:",
+                placeholder="Nome do Professor",
+                key="docente_pei"
+            )
+
+            disciplina = col2.text_input(
+                "Componente Curricular:",
+                placeholder="Nome da Disciplina",
+                key="disciplina_pei"
+            )
+
+            obs = st.text_input(
+                "Observação (Se houve alguma informação relevante não contemplada em outros itens):",
+                value=str(aluno.get("Obs.", "")),
+                key="obs_pei"
+            )
+
+            conteudo_programatico = st.text_area(
+                "(08) Conteúdos Programáticos:",
+                value=st.session_state.get("k_08_pei", ""),
+                key="k_08_pei",
+                height=80
+            )
 
 
 
