@@ -233,7 +233,7 @@ with tab_pei:
             col1, col2 = st.columns(2)
             docente = col1.text_input("Docente:", placeholder="Nome do Professor", key="docente_pei")
             disciplina = col2.text_input("Componente Curricular:", placeholder="Nome da Disciplina", key="disciplina_pei")
-            obs = st.text_input("Obs.:", value=str(aluno.get("Obs.", "")), key="obs_pei")
+            obs = st.text_input("Observação (Se houve alguma informação relevante não contemplada em outros itens):", value=str(aluno.get("Obs.", "")), key="obs_pei")
 
 
         diag_txt = st.text_area(
