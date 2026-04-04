@@ -200,32 +200,7 @@ with col_centro:
 # =========================================================
 # DADOS (GSHEETS)
 # =========================================================
-conn = st.connection("gsheets", type=GSheetsConnection)
-
-df = conn.read(
-    worksheet="Página1",
-    ttl=0
-)
-
-df.columns = [str(c).strip() for c in df.columns]
-
-st.write("DF completo:")
-st.write(df)
-
-st.write("Shape:", df.shape)
-
-if "Nome do Estudante" in df.columns:
-    df["Nome do Estudante"] = (
-        df["Nome do Estudante"]
-        .astype(str)
-        .str.strip()
-    )
-
-    nomes = df["Nome do Estudante"].dropna().unique().tolist()
-
-    st.write("Nomes:")
-    for i, nome in enumerate(nomes):
-        st.write(i, repr(nome))
+conn = st.connection("gsheets", type=GSheetsConnection) df = conn.read() df.columns = [str(c).strip() for c in df.columns] nomes = [] if "Nome do Estudante" in df.columns: nomes = df["Nome do Estudante"].dropna().unique().tolist()
 
 # =========================================================
 # ABAS
