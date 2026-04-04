@@ -312,17 +312,18 @@ REGRAS IMPORTANTES:
 11 - Resultados Esperados:
 
 2) Não escreva nada fora desses quatro blocos. Não inclua 08, 02, comentários, introdução, nem explicações.
-3) Escreva em português, em tópicos curtos e objetivos (sem textão).
+3) Escreva em português.
 4) Seja realista e aplicável em sala (IFMT). Priorize acessibilidade, UDL/DUA e adaptações razoáveis (sem inventar diagnóstico).
 5) Metodologia e avaliação devem estar coerentes com:
    - necessidades, habilidades, dificuldades e adaptações informadas
+   - O conteúdo progrático deve ser levado em conta fortemente ("k_08_pei")
    - integre obrigatoriamente as "adptações razoáveis/acessibilidades curriculares"
    - ancore as estratégias nos "interesses e capacidades" do aluno para aumentar o engajamento e contornar as "dificuldades apresentadas".
    - o conteúdo programático (08)
    - o componente curricular (disciplina)
 6) Avaliação: descreva como avaliar com flexibilidade (instrumentos, tempo, forma, critérios), e como registrar evidências.
 7) Resultados esperados: mensuráveis e observáveis.
-8) Nos objetivos específicos traduza o conteúdo planejado pelo professor em metas de aprendizagem claras e dimensionadas para o aluno, utilizando verbos de ação mensuráveis e objetivos, no que o aluno deve e consegue fazer com os apoios necessários.
+8) Nos objetivos específicos traduza o conteúdo planejado pelo professor em metas de aprendizagem claras e dimensionadas para o aluno, utilizando verbos de ação mensuráveis e objetivos, no que o aluno deve e consegue fazer com os apoios necessários, o conteúdo prográmatico deve ser levando em consideração
 
 DADOS DO CONTEXTO
 Aluno: {aluno_nome}
