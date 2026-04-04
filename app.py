@@ -246,11 +246,13 @@ with tab_pei:
     if aluno_nome != "Selecione...":
         aluno = df[df["Nome do Estudante"] == aluno_nome].iloc[0].to_dict()
 
-        with st.expander("👤 (01) Dados Pessoais", expanded=True):
+        with st.expander("👤 (01) Dados do Professor", expanded=True):
             col1, col2 = st.columns(2)
             docente = col1.text_input("Docente:", placeholder="Nome do Professor", key="docente_pei")
             disciplina = col2.text_input("Componente Curricular:", placeholder="Nome da Disciplina", key="disciplina_pei")
             obs = st.text_input("Observação (Se houve alguma informação relevante não contemplada em outros itens):", value=str(aluno.get("Obs.", "")), key="obs_pei")
+            st.text_area("(08) Conteúdos Programáticos:", key="k_08_pei", height=80)
+
 
 
         diag_txt = st.text_area(
@@ -291,8 +293,6 @@ with tab_pei:
             value=str(aluno.get("(06) Adaptações Razoáveis e/ou Acessibilidades", "")),
             key="ada_pei",
         )
-
-        st.text_area("(08) Conteúdos Programáticos:", key="k_08_pei", height=80)
 
         if st.button("🚀 Gerar Sugestões e Preencher (PEI)", key="btn_ia_pei"):
             if not docente or not disciplina or not st.session_state.k_08_pei:
