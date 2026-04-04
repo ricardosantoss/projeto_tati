@@ -200,28 +200,33 @@ with col_centro:
 # =========================================================
 # DADOS (GSHEETS)
 # =========================================================
+# =========================================================
+# DADOS (GSHEETS)
+# =========================================================
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-df = conn.read(
-    worksheet=0,
-    ttl=0
-)
-
-df.columns = [str(c).strip() for c in df.columns]
-
-if "Nome do Estudante" in df.columns:
-    df["Nome do Estudante"] = (
-        df["Nome do Estudante"]
-        .astype(str)
-        .str.strip()
-        .str.replace(r"\s+", " ", regex=True)
+try:
+    df = conn.read(
+        worksheet=0,   # gid=0
+        ttl=0
     )
-    nomes = df["Nome do Estudante"].dropna().unique().tolist()
-else:
-    nomes = []
 
-st.write("Shape:", df.shape)
-st.write(df.head())
+    df.columns = [str(c).strip() for c in df.columns]
+
+    if "Nome do Estudante" in df.columns:
+        df["Nome do Estudante"] = (
+            df["Nome do Estudante"]
+            .astype(str)
+            .str.strip()
+            .str.replace(r"\s+", " ", regex=True)
+        )
+        nomes = df["Nome do Estudante"].dropna().unique().tolist()
+    else:
+        nomes = []
+
+except Exception as e:
+    st.error(f"Erro ao ler Google Sheets: {e}")
+    st.stop()
 # =========================================================
 # ABAS
 # =========================================================
