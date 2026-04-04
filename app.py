@@ -200,21 +200,49 @@ with col_centro:
 # =========================================================
 # DADOS (GSHEETS)
 # =========================================================
+import streamlit as st
+from streamlit_gsheets import GSheetsConnection
+
+# conexão
 conn = st.connection("gsheets", type=GSheetsConnection)
 
+# leitura (troque "Sheet1" pelo nome da aba real)
 df = conn.read(
-    worksheet="NomeDaAba",
-    ttl=0
+    worksheet="Sheet1",  # 👈 MUITO IMPORTANTE
+    ttl=0                # evita cache
 )
 
+# limpar nomes de colunas
 df.columns = [str(c).strip() for c in df.columns]
 
+# DEBUG
+st.write("DataFrame completo:")
 st.write(df)
 
-nomes = []
+st.write("Shape:", df.shape)
+
+# limpar coluna
 if "Nome do Estudante" in df.columns:
+    df["Nome do Estudante"] = (
+        df["Nome do Estudante"]
+        .astype(str)
+        .str.strip()
+        .str.replace(r"\s+", " ", regex=True)
+    )
+
     nomes = df["Nome do Estudante"].dropna().unique().tolist()
+else:
+    nomes = []
+
+# debug nomes
+st.write("Coluna Nome do Estudante:")
 st.write(df["Nome do Estudante"])
+
+st.write("Lista de nomes:")
+for i, nome in enumerate(nomes):
+    st.write(i, repr(nome))
+
+st.write("Total de nomes:", len(nomes))
 
 # =========================================================
 # ABAS
