@@ -216,10 +216,6 @@ if "Nome do Estudante" in df.columns:
     nomes = df["Nome do Estudante"].dropna().unique().tolist()
 st.write(df["Nome do Estudante"])
 
-nomes = []
-if "Nome do Estudante" in df.columns:
-    nomes = df["Nome do Estudante"].dropna().unique().tolist()
-st.write(df["Nome do Estudante"])
 # =========================================================
 # ABAS
 # =========================================================
