@@ -246,7 +246,7 @@ with tab_pei:
     if aluno_nome != "Selecione...":
         aluno = df[df["Nome do Estudante"] == aluno_nome].iloc[0].to_dict()
 
-        with st.expander("👤 (01) Dados do Professor", expanded=True):
+    with st.expander("👤 (01) Dados do Professor", expanded=True):
     col1, col2 = st.columns(2)
     docente = col1.text_input("Docente:", placeholder="Nome do Professor", key="docente_pei")
     disciplina = col2.text_input("Componente Curricular:", placeholder="Nome da Disciplina", key="disciplina_pei")
