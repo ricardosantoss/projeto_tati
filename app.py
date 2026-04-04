@@ -316,10 +316,13 @@ REGRAS IMPORTANTES:
 4) Seja realista e aplicável em sala (IFMT). Priorize acessibilidade, UDL/DUA e adaptações razoáveis (sem inventar diagnóstico).
 5) Metodologia e avaliação devem estar coerentes com:
    - necessidades, habilidades, dificuldades e adaptações informadas
+   - integre obrigatoriamente as "adptações razoáveis/acessibilidades curriculares"
+   - ancore as estratégias nos "interesses e capacidades" do aluno para aumentar o engajamento e contornar as "dificuldades apresentadas".
    - o conteúdo programático (08)
    - o componente curricular (disciplina)
 6) Avaliação: descreva como avaliar com flexibilidade (instrumentos, tempo, forma, critérios), e como registrar evidências.
 7) Resultados esperados: mensuráveis e observáveis.
+8) Nos objetivos específicos traduza o conteúdo planejado pelo professor em metas de aprendizagem claras e dimensionadas para o aluno, utilizando verbos de ação mensuráveis e objetivos, no que o aluno deve e consegue fazer com os apoios necessários.
 
 DADOS DO CONTEXTO
 Aluno: {aluno_nome}
