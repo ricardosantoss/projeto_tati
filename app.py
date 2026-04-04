@@ -81,8 +81,8 @@ def call_maritalk(prompt: str) -> str:
         payload = {
             "model": "sabia-3",
             "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 1800,
-            "temperature": 0.5,
+            "max_tokens": 6000,
+            "temperature": 0.2,
         }
         r = requests.post(url, headers=headers, json=payload, timeout=60)
         r.raise_for_status()
