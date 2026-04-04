@@ -208,8 +208,6 @@ nomes = []
 if "Nome do Estudante" in df.columns:
     nomes = df["Nome do Estudante"].dropna().unique().tolist()
 
-st.write("Colunas encontradas:", df.columns.tolist())
-
 # =========================================================
 # ABAS
 # =========================================================
