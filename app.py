@@ -200,6 +200,17 @@ with col_centro:
 # =========================================================
 # DADOS (GSHEETS)
 # =========================================================
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+df = conn.read(
+    worksheet="NomeDaAba",
+    ttl=0
+)
+
+df.columns = [str(c).strip() for c in df.columns]
+
+st.write(df)
+
 nomes = []
 if "Nome do Estudante" in df.columns:
     nomes = df["Nome do Estudante"].dropna().unique().tolist()
