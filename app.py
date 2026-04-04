@@ -247,11 +247,21 @@ with tab_pei:
         aluno = df[df["Nome do Estudante"] == aluno_nome].iloc[0].to_dict()
 
         with st.expander("👤 (01) Dados do Professor", expanded=True):
-            col1, col2 = st.columns(2)
-            docente = col1.text_input("Docente:", placeholder="Nome do Professor", key="docente_pei")
-            disciplina = col2.text_input("Componente Curricular:", placeholder="Nome da Disciplina", key="disciplina_pei")
-            obs = st.text_input("Observação (Se houve alguma informação relevante não contemplada em outros itens):", value=str(aluno.get("Obs.", "")), key="obs_pei")
-            st.text_area("(08) Conteúdos Programáticos:", key="k_08_pei", height=80)
+    col1, col2 = st.columns(2)
+    docente = col1.text_input("Docente:", placeholder="Nome do Professor", key="docente_pei")
+    disciplina = col2.text_input("Componente Curricular:", placeholder="Nome da Disciplina", key="disciplina_pei")
+    obs = st.text_input(
+        "Observação (Se houve alguma informação relevante não contemplada em outros itens):",
+        value=str(aluno.get("Obs.", "")),
+        key="obs_pei"
+    )
+
+    conteudo_programatico = st.text_area(
+        "(08) Conteúdos Programáticos:",
+        value=st.session_state.get("k_08_pei", ""),
+        key="k_08_pei",
+        height=80
+    )
 
 
 
@@ -295,7 +305,7 @@ with tab_pei:
         )
 
         if st.button("🚀 Gerar Sugestões e Preencher (PEI)", key="btn_ia_pei"):
-            if not docente or not disciplina or not st.session_state.k_08_pei:
+            if not docente.strip() or not disciplina.strip() or not conteudo_programatico.strip():
                 st.error("Preencha Docente, Componente Curricular e o Conteúdo (08) primeiro.")
             else:
                 with st.spinner("IA processando e preenchendo os campos..."):
@@ -351,7 +361,7 @@ Obs.:
 {obs}
 
 (08) Conteúdos Programáticos:
-{st.session_state.k_08_pei}
+{conteudo_programatico}
 
 AGORA GERE A SAÍDA NO FORMATO EXATO.
 """
@@ -416,7 +426,7 @@ AGORA GERE A SAÍDA NO FORMATO EXATO.
             pdf.info_box(st.session_state.k_07)
 
             pdf.section_header("(08) CONTEÚDOS PROGRAMÁTICOS")
-            pdf.info_box(st.session_state.k_08_pei)
+            pdf.info_box(conteudo_programatico)
 
             pdf.section_header("(09) METODOLOGIA")
             pdf.info_box(st.session_state.k_09)
