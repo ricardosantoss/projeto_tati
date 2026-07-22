@@ -79,7 +79,7 @@ def call_maritalk(prompt: str) -> str:
         url = "https://chat.maritaca.ai/api/chat/completions"
         headers = {"Authorization": f"Key {api_key}", "Content-Type": "application/json"}
         payload = {
-            "model": "sabia-3",
+            "model": "sabiazinho-4",
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 6000,
             "temperature": 0.2,
